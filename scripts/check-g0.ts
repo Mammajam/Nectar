@@ -3,9 +3,11 @@
  *   npm run check:g0                  read-only checks
  *   npm run check:g0 -- --stream 60   also listen 60 s and talk near your watch
  *   npm run check:g0 -- --alarm       also create a test todo with an alarm 5 min ahead
+ *   npm run check:g0 -- --bedrock     also make one Bedrock call with NECTAR_MODEL_ID
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { BedrockStructuredLlm } from '../src/ai/bedrock.js';
 import { BeeClient } from '../src/bee/client.js';
 import { ensureProxy } from '../src/bee/proxy.js';
 import { CliStreamSource } from '../src/bee/stream.js';
@@ -17,6 +19,7 @@ const args = process.argv.slice(2);
 const streamIdx = args.indexOf('--stream');
 const streamSeconds = streamIdx >= 0 ? Number(args[streamIdx + 1] ?? 60) : 0;
 const wantAlarm = args.includes('--alarm');
+const wantBedrock = args.includes('--bedrock');
 
 const results: { name: string; ok: boolean; detail: string }[] = [];
 const record = (name: string, ok: boolean, detail: string) => {
@@ -27,6 +30,23 @@ const record = (name: string, ok: boolean, detail: string) => {
 async function main() {
   loadDotEnv();
   const config = loadConfig();
+
+  if (wantBedrock) {
+    try {
+      const llm = new BedrockStructuredLlm(config.modelId, { region: config.awsRegion, maxRetries: 1 });
+      const t0 = Date.now();
+      const out = await llm.structured({
+        system: 'You are a test.',
+        user: 'Call the tool with ok=true.',
+        tool: { name: 'ping', description: 'Health check', schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] } },
+        maxTokens: 50,
+      });
+      record('Bedrock model call', true, `${config.modelId} answered ${JSON.stringify(out)} in ${Date.now() - t0} ms`);
+    } catch (e) {
+      const name = (e as { name?: string }).name ?? 'Error';
+      record('Bedrock model call', false, `${name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   try {
     const { stdout } = await run(config.beeBin, ['version']);
@@ -110,6 +130,6 @@ main()
     const failed = results.filter((r) => !r.ok).length;
     console.log(`\nG0: ${results.length - failed}/${results.length} checks passed.`);
     console.log('Log anything that went wrong in FRICTION_LOG.md.');
-    console.log('Still to do by hand: Bedrock Anthropic use-case form + one Converse call.');
+    if (!wantBedrock) console.log('Bedrock not checked: add --bedrock to test model access.');
     process.exit(failed ? 1 : 0);
   });

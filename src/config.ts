@@ -8,6 +8,26 @@ export interface Config {
   timezone: string;
   streamMode: StreamMode;
   streamTypes: string[];
+  awsRegion: string;
+  modelId: string;
+  /** Commitments below this are discarded. */
+  minConfidence: number;
+  /** At or above this a commitment is "open"; below it, "suggested". */
+  openThreshold: number;
+  /** Silence before a conversation window is analyzed. */
+  windowPauseMs: number;
+  /** Set NECTAR_EXTRACTION=off to run Phase 1 only (no model calls). */
+  extractionEnabled: boolean;
+}
+
+export const DEFAULT_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
+
+function num(env: NodeJS.ProcessEnv, key: string, fallback: number, min: number, max: number): number {
+  const raw = env[key];
+  if (raw === undefined || raw === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < min || n > max) throw new Error(`${key} must be a number between ${min} and ${max}, got "${raw}"`);
+  return n;
 }
 
 export const DEFAULT_STREAM_TYPES = [
@@ -41,5 +61,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timezone: env.NECTAR_TIMEZONE ?? 'Africa/Monrovia',
     streamMode: mode,
     streamTypes: types.length > 0 ? types : DEFAULT_STREAM_TYPES,
+    awsRegion: env.AWS_REGION || 'us-east-1',
+    modelId: env.NECTAR_MODEL_ID || DEFAULT_MODEL_ID,
+    minConfidence: num(env, 'NECTAR_MIN_CONFIDENCE', 0.4, 0, 1),
+    openThreshold: num(env, 'NECTAR_OPEN_THRESHOLD', 0.7, 0, 1),
+    windowPauseMs: num(env, 'NECTAR_WINDOW_PAUSE_MS', 20_000, 1000, 600_000),
+    extractionEnabled: (env.NECTAR_EXTRACTION ?? 'on').toLowerCase() !== 'off',
   };
 }

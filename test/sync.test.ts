@@ -37,6 +37,15 @@ describe('catchUp', () => {
     expect(cursors[0]).toBeNull();
   });
 
+  it('reports each new utterance to the callback', async () => {
+    const store = new Store(':memory:');
+    const seen: string[] = [];
+    await catchUp(fakeClient().client, store, (e) => {
+      if (e.kind === 'utterance') seen.push(e.utterance.text);
+    });
+    expect(seen).toEqual(["I'll send the invoice Friday", 'Thanks']);
+  });
+
   it('is idempotent and resumes from the saved cursor', async () => {
     const store = new Store(':memory:');
     const { client, cursors } = fakeClient();

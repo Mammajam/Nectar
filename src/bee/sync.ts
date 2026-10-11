@@ -1,5 +1,5 @@
 import type { BeeClient } from './client.js';
-import { classifyEvent, isObject, type BeeUtterance } from './types.js';
+import { classifyEvent, isObject, type BeeEvent, type BeeUtterance } from './types.js';
 import type { Store } from '../store/db.js';
 
 export const CHANGES_CURSOR_KEY = 'bee.changes.cursor';
@@ -27,7 +27,11 @@ export function utterancesOf(conversation: unknown): BeeUtterance[] {
  * so this runs on startup (and can run on a timer) to fill gaps.
  * Utterances are deduplicated by the store, so running it twice is safe.
  */
-export async function catchUp(client: BeeClient, store: Store): Promise<CatchUpResult> {
+export async function catchUp(
+  client: BeeClient,
+  store: Store,
+  onNewEvent?: (event: BeeEvent) => void,
+): Promise<CatchUpResult> {
   const page = await client.changes(store.get(CHANGES_CURSOR_KEY));
   const conversationIds = new Set(
     page.changes.filter((c) => c.type === 'conversation').map((c) => String(c.id)),
@@ -39,7 +43,10 @@ export async function catchUp(client: BeeClient, store: Store): Promise<CatchUpR
     for (const utterance of utterancesOf(conversation)) {
       if (typeof utterance?.text !== 'string') continue;
       const event = classifyEvent({ utterance, conversation_id: id });
-      if (store.insertEvent(event)) newUtterances++;
+      if (store.insertEvent(event)) {
+        newUtterances++;
+        onNewEvent?.(event);
+      }
     }
   }
 

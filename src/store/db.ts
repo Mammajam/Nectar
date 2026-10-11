@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { BeeEvent } from '../bee/types.js';
+import type { Commitment } from '../ai/types.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS events (
@@ -25,7 +26,9 @@ CREATE TABLE IF NOT EXISTS commitments (
   source_conversation_id TEXT,
   bee_todo_id TEXT,
   status TEXT NOT NULL DEFAULT 'open',
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  due_text TEXT,
+  quote TEXT
 );
 
 CREATE TABLE IF NOT EXISTS kv (
@@ -33,6 +36,16 @@ CREATE TABLE IF NOT EXISTS kv (
   value TEXT NOT NULL
 );
 `;
+
+export type CommitmentStatus = 'open' | 'suggested' | 'done' | 'dismissed';
+
+export interface StoredCommitment extends Commitment {
+  id: number;
+  conversationId: string | null;
+  status: CommitmentStatus;
+  beeTodoId: string | null;
+  createdAt: number;
+}
 
 export interface StoredEvent {
   id: number;
@@ -90,6 +103,16 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Add columns introduced after Phase 1 to databases created earlier. */
+  private migrate(): void {
+    const cols = new Set(
+      (this.db.prepare('PRAGMA table_info(commitments)').all() as { name: string }[]).map((c) => c.name),
+    );
+    if (!cols.has('due_text')) this.db.exec('ALTER TABLE commitments ADD COLUMN due_text TEXT');
+    if (!cols.has('quote')) this.db.exec('ALTER TABLE commitments ADD COLUMN quote TEXT');
   }
 
   /** Returns true when the event was new, false when it was a duplicate. */
@@ -119,6 +142,45 @@ export class Store {
       ? this.db.prepare('SELECT COUNT(*) AS n FROM events WHERE kind = ?').get(kind)
       : this.db.prepare('SELECT COUNT(*) AS n FROM events').get();
     return Number((row as { n: number }).n);
+  }
+
+  insertCommitment(c: Commitment, conversationId: string | null, status: CommitmentStatus, now = Date.now()): number {
+    const r = this.db
+      .prepare(
+        `INSERT INTO commitments (who, what, due_at, due_text, confidence, quote, source_conversation_id, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(c.who, c.what, c.dueAt ? Date.parse(c.dueAt) : null, c.dueText, c.confidence, c.quote, conversationId, status, now);
+    return Number(r.lastInsertRowid);
+  }
+
+  /** Open or suggested commitments with the same action from the same conversation, for de-duplication. */
+  findSimilarCommitment(what: string, conversationId: string | null): StoredCommitment | null {
+    const key = what.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    const rows = this.listCommitments(['open', 'suggested']).filter(
+      (c) => c.conversationId === conversationId,
+    );
+    return rows.find((c) => c.what.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim() === key) ?? null;
+  }
+
+  listCommitments(statuses: CommitmentStatus[] = ['open']): StoredCommitment[] {
+    const marks = statuses.map(() => '?').join(',');
+    const rows = this.db
+      .prepare(`SELECT * FROM commitments WHERE status IN (${marks}) ORDER BY COALESCE(due_at, 9e15), id`)
+      .all(...statuses) as Record<string, unknown>[];
+    return rows.map((r) => ({
+      id: Number(r.id),
+      who: (r.who as string | null) ?? null,
+      what: String(r.what),
+      dueText: (r.due_text as string | null) ?? null,
+      dueAt: r.due_at == null ? null : new Date(Number(r.due_at)).toISOString(),
+      confidence: Number(r.confidence),
+      quote: String(r.quote ?? ''),
+      conversationId: (r.source_conversation_id as string | null) ?? null,
+      status: r.status as CommitmentStatus,
+      beeTodoId: (r.bee_todo_id as string | null) ?? null,
+      createdAt: Number(r.created_at),
+    }));
   }
 
   get(key: string): string | null {

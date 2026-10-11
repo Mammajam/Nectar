@@ -15,12 +15,18 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest run",
     "test:watch": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest",
-    "check:g0": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/check-g0.ts"
+    "check:g0": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/check-g0.ts",
+    "eval": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/eval-extraction.ts",
+    "commitments": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/list-commitments.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1149.0",
+    "@modelcontextprotocol/sdk": "^1.32.1"
   }
 }

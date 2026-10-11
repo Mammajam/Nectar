@@ -1,0 +1,93 @@
+{
+  "now": "2026-10-12T09:30:00Z",
+  "timezone": "Africa/Monrovia",
+  "facts": ["Musa is my rice supplier", "Fatu manages the Duala branch", "Mr. Kollie is our landlord"],
+  "cases": [
+    {
+      "id": "explicit-time",
+      "utterances": [
+        ["me", "Musa, the prices went up again this week."],
+        ["Musa", "I know, can you send me your updated order?"],
+        ["me", "Yes, I'll send you the updated order by 3 PM today."]
+      ],
+      "expected": [{ "keywords": ["order"], "who": "musa", "dueDate": "2026-10-12" }]
+    },
+    {
+      "id": "weekday",
+      "utterances": [
+        ["Fatu", "We are running low on cooking oil at Duala."],
+        ["me", "Okay, I will arrange a delivery to Duala on Thursday."]
+      ],
+      "expected": [{ "keywords": ["deliver"], "who": "fatu", "dueDate": "2026-10-15" }]
+    },
+    {
+      "id": "tomorrow-morning",
+      "utterances": [
+        ["Mr. Kollie", "The rent receipt from last month is missing."],
+        ["me", "Sorry about that, I'll bring the receipt tomorrow morning."]
+      ],
+      "expected": [{ "keywords": ["receipt"], "who": "kollie", "dueDate": "2026-10-13" }]
+    },
+    {
+      "id": "no-time",
+      "utterances": [
+        ["Customer", "My order still hasn't arrived."],
+        ["me", "Let me check with the driver and get back to you."]
+      ],
+      "expected": [{ "keywords": ["driver"], "who": null, "dueDate": null }]
+    },
+    {
+      "id": "two-promises",
+      "utterances": [
+        ["me", "Team, I'll update the stock sheet tonight."],
+        ["Ama", "And the supplier call?"],
+        ["me", "I'll call Musa on Wednesday about the discount."]
+      ],
+      "expected": [
+        { "keywords": ["stock"], "who": null, "dueDate": "2026-10-12" },
+        { "keywords": ["musa"], "who": null, "dueDate": "2026-10-14" }
+      ]
+    },
+    {
+      "id": "end-of-day",
+      "utterances": [
+        ["Fatu", "Head office needs the sales report."],
+        ["me", "I'll email it to them before end of day."]
+      ],
+      "expected": [{ "keywords": ["report"], "who": null, "dueDate": "2026-10-12" }]
+    },
+    {
+      "id": "request-not-promise",
+      "utterances": [
+        ["me", "Fatu, can you send me the Duala sales figures?"],
+        ["Fatu", "Yes, I'll send them this afternoon."]
+      ],
+      "expected": []
+    },
+    {
+      "id": "small-talk",
+      "utterances": [
+        ["me", "Good morning, how was church yesterday?"],
+        ["Ama", "It was nice, thank you. Big crowd."],
+        ["me", "That's good to hear."]
+      ],
+      "expected": []
+    },
+    {
+      "id": "past-action",
+      "utterances": [
+        ["Musa", "Did you pay the invoice?"],
+        ["me", "Yes, I paid it on Friday."]
+      ],
+      "expected": []
+    },
+    {
+      "id": "vague-intention",
+      "utterances": [
+        ["Ama", "We should all go out for lunch sometime."],
+        ["me", "Yeah, that would be nice someday."]
+      ],
+      "expected": []
+    }
+  ]
+}
