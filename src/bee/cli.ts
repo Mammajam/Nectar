@@ -33,6 +33,16 @@ export class BeeCli {
     }
   }
 
+  /** Today's brief (calendar events, emails) as raw JSON, or null if unavailable. */
+  async today(): Promise<unknown | null> {
+    try {
+      const { stdout } = await this.exec(this.beeBin, ['today', '--json']);
+      return JSON.parse(stdout) as unknown;
+    } catch {
+      return null;
+    }
+  }
+
   async acceptSuggestion(id: BeeId): Promise<BeeId | null> {
     try {
       const { stdout } = await this.exec(this.beeBin, ['todos', 'accept-suggestion', String(id), '--json']);

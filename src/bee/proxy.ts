@@ -8,7 +8,7 @@ export interface ProxyHandle {
   stop(): void;
 }
 
-async function isUp(url: string, fetchImpl: typeof fetch): Promise<boolean> {
+export async function isUp(url: string, fetchImpl: typeof fetch): Promise<boolean> {
   try {
     const res = await fetchImpl(new URL('/v1/me', url), { signal: AbortSignal.timeout(2000) });
     return res.ok;

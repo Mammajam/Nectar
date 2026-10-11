@@ -2,139 +2,149 @@
 
 **Bee remembers what you said. Nectar makes sure you do it.**
 
-Nectar is an ambient commitment agent for [Bee](https://docs.bee.computer/docs), Amazon's wearable AI. It listens to live conversation data from Bee on an Apple Watch, detects promises you make ("I'll send the price list by 3 PM"), and turns them into Bee to-dos whose alarms fire on your wrist.
+Nectar is an ambient commitment agent for [Bee](https://docs.bee.computer/docs), Amazon's wearable AI. It listens to live conversation data from Bee on an Apple Watch, detects the promises you make ("I'll send Musa the price list by 3 PM"), and turns them into Bee to-dos whose alarms fire on your wrist. A voice note closes them out, and an evening review tells you what you kept.
 
-Built for the Amazon Developer *Build, Ship, Shape* hackathon, Bee (Wearable AI) track.
+Built for the Amazon Developer *Build, Ship, Shape* hackathon: **Bee (Wearable AI)** track, with the **AWS Builder** mini challenge.
 
-## Status
+![CI](https://github.com/Mammajam/Nectar/actions/workflows/ci.yml/badge.svg)
 
-| Phase | Scope | State |
+## What it does
+
+| Moment | What Nectar does | On the wrist |
 | --- | --- | --- |
-| 0 | Access and foundations: repo, config, gate-check script | Done (run `npm run check:g0` on your machine) |
-| 1 | Bee data layer: API client, live stream, catch-up, SQLite store | Done |
-| 2 | Commitment extraction with Amazon Bedrock + Bee MCP context | Done; run `npm run eval` for gate G2 |
-| 3 | To-do + wrist alarm, evening review, voice close-out | Done; verify live for gate G3 |
-| 4 | Hardening, tests, optional features | Planned |
-| 5 | Demo video and submission | Planned |
+| You make a promise in conversation | Detects it with Amazon Bedrock, using your Bee facts and today's brief for names and times | — |
+| Seconds later | Creates a Bee to-do with an alarm 10 min before it's due (or links an existing to-do or Bee suggestion) | `Send Musa the price list · due 3 PM` |
+| 10 min before a meeting | Lists what you still owe the people you're about to meet | `10 AM Supplier call: you owe Send Musa the price list +1` |
+| You say "done with the price list" | Completes the matching to-do | to-do checked off |
+| 6 PM | Syncs what you finished, moves the rest to 9 AM tomorrow | `Nectar: 2/3 kept today. Open: Update the stock sheet` |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  W[Apple Watch<br/>running Bee] --> P[Bee iOS app] --> C[(Bee cloud)]
+  C <--> CLI[bee CLI<br/>proxy · stream · MCP]
+  subgraph N[Nectar on your laptop]
+    S[Stream + catch-up] --> WIN[Utterance windows]
+    WIN --> EX[Commitment extractor]
+    EX --> DB[(SQLite)]
+    DB --> SCH[Scheduler]
+    DB --> REC[Pre-meeting recap]
+    DB --> REV[Evening review]
+    CO[Voice close-out] --> DB
+  end
+  CLI --> S
+  CLI -- facts, today --> EX
+  EX <--> BR[Amazon Bedrock<br/>Claude Haiku]
+  SCH -- to-do + alarm --> CLI
+  REC -- recap to-do --> CLI
+  REV -- summary to-do --> CLI
+  CLI -- journals, to-do updates --> CO
+```
+
+Nectar needs no custom watch app: everything reaches the wrist as native Bee to-dos and alarms.
 
 ## How it uses Bee
 
-All Bee access goes through the official CLI, [`@beeai/cli`](https://docs.bee.computer/docs):
+All Bee access goes through the official CLI, [`@beeai/cli`](https://docs.bee.computer/docs).
 
 | Bee surface | Where in code | Used for |
 | --- | --- | --- |
-| `bee proxy` (local REST API at `127.0.0.1:8787/v1/*`) | `src/bee/proxy.ts`, `src/bee/client.ts` | To-dos, facts, conversations, changefeed |
-| `bee stream --json` (live events) | `src/bee/stream.ts` (`CliStreamSource`) | New utterances, conversations, journals, to-dos |
-| `GET /v1/stream` (SSE) | `src/bee/stream.ts` (`SseStreamSource`) | Alternative live source (`NECTAR_STREAM_MODE=sse`) |
-| `GET /v1/changes` with cursor | `src/bee/sync.ts` | Catch-up after downtime (the stream is at-most-once) |
-| `bee mcp serve` (MCP, stdio) | `src/ai/context.ts` (`McpContextProvider`) | Confirmed facts and today's brief as context for the model |
-
-```
-Apple Watch (Bee) -> Bee iOS app -> Bee cloud -> bee CLI (proxy + stream + MCP) -> Nectar
-Nectar: utterances -> 20 s windows -> Amazon Bedrock (Converse, forced tool) -> commitments (SQLite)
-Nectar: open commitments -> POST /v1/todos (alarm_at, 10 min early) -> alarm on the watch
-Close the loop: voice note "done with X" or ticking the to-do -> commitment done; 6 PM review -> summary on the wrist
-```
-
-## The wrist loop (Phase 3)
-
-| Step | What happens | Code |
-| --- | --- | --- |
-| Schedule | Due time from the model, else from the spoken words ("tonight", "Thursday morning", "by 3"), else the next work block (2 h later, or 9 AM after 4 PM) | `src/actions/schedule.ts` |
-| De-dupe | Links to a matching open Bee to-do, or accepts Bee's own matching suggestion, before creating anything | `src/actions/scheduler.ts` |
-| Nudge | Bee to-do with `alarm_at` 10 min before due; text under 80 characters, e.g. `Send Musa the price list · due 3 PM` | `src/actions/scheduler.ts` |
-| Close out | A voice note ("done with the price list", "I've sent Musa the order") completes the matching to-do; ticking it in Bee marks it done in Nectar | `src/actions/closeout.ts` |
-| Review | At 6 PM: sync completion from Bee, flag items the daily summary suggests are done, move unfinished ones to 9 AM tomorrow, and put `Nectar: 2/3 kept today. Open: ...` on the wrist | `src/actions/review.ts` |
+| `bee proxy`: local REST API at `127.0.0.1:8787/v1/*` | `src/bee/proxy.ts`, `src/bee/client.ts` | To-dos (create, update, complete), facts, conversations, daily summaries, changefeed |
+| `bee stream --json`: live events | `src/bee/stream.ts` (`CliStreamSource`) | New utterances, conversations, journals, to-do updates |
+| `GET /v1/stream`: SSE | `src/bee/stream.ts` (`SseStreamSource`) | Alternative live source (`NECTAR_STREAM_MODE=sse`) |
+| `GET /v1/changes` with cursor | `src/bee/sync.ts` | Catch-up at startup and every 5 min; the stream is at-most-once |
+| `bee mcp serve`: MCP over stdio | `src/ai/context.ts` (`McpContextProvider`) | Confirmed facts and today's brief as model context |
+| `bee todos suggestions` / `accept-suggestion` | `src/bee/cli.ts`, `src/actions/scheduler.ts` | Accept Bee's own matching suggestion instead of duplicating it |
+| `bee today --json` | `src/actions/recap.ts` | Calendar events for pre-meeting recaps |
 
 AWS details for the AWS Builder mini challenge: [docs/aws.md](docs/aws.md).
 
-## Setup
+## Quick start
 
-Requirements: Node.js 22.13+ (uses the built-in `node:sqlite`), an Apple Watch running Bee, and the Bee iOS app.
-
-1. In the Bee iOS app, unlock **Developer Mode** by tapping the version number 5 times.
-2. Install the CLI and sign in:
-   ```bash
-   npm i -g @beeai/cli
-   bee login
-   bee status
-   ```
-3. Install and configure Nectar:
-   ```bash
-   npm install
-   cp .env.example .env
-   ```
-4. Run the Phase 0 gate check:
-   ```bash
-   npm run check:g0                 # read-only checks
-   npm run check:g0 -- --stream 60  # listen 60 s; talk near your watch
-   npm run check:g0 -- --alarm      # create a test to-do with an alarm in 5 min
-   ```
-5. Set up Amazon Bedrock (see [docs/aws.md](docs/aws.md)), then check access and extraction quality:
-   ```bash
-   npm run check:g0 -- --bedrock
-   npm run eval
-   ```
-6. Start Nectar:
-   ```bash
-   npm run dev
-   ```
-   Nectar reads `.env` automatically. Press Ctrl+C to stop. Talk near your watch; after 20 s of silence you'll see lines like:
-   ```
-   [commitment open] Send Musa the price list -> Musa | due 2026-10-12T15:00:00.000Z (95%)
-   ```
-   List what it has captured with `npm run commitments`. Other commands:
-   ```bash
-   npm run schedule            # create to-dos for open commitments that have none
-   npm run review -- --dry-run # preview the evening review
-   npm run review              # run it now
-   ```
-
-## Development
+Requirements: Node.js 22.13+, an Apple Watch running Bee with the Bee iOS app, and an AWS account with Bedrock access. In the Bee iOS app, unlock **Developer Mode** by tapping the version number 5 times.
 
 ```bash
-npm test          # unit tests (Vitest)
-npm run typecheck # TypeScript strict mode
-npm run build     # compile to dist/
+npm i -g @beeai/cli && bee login        # 1. Bee CLI
+git clone https://github.com/Mammajam/Nectar.git && cd Nectar && npm install   # 2. Nectar
+cp .env.example .env                     # 3. settings (defaults work)
+npm run check:g0 -- --bedrock --alarm    # 4. check Bee + Bedrock access
+npm run dev                              # 5. run it
 ```
+
+For Bedrock, run `aws configure` and submit the one-time Anthropic use-case form in the Bedrock console ([docs/aws.md](docs/aws.md)). No Anthropic access yet? Set `NECTAR_MODEL_ID=us.amazon.nova-lite-v1:0`.
+
+Then talk near your watch. After 20 s of silence you'll see:
+
+```
+10:53:59  [commitment open] Send Musa the price list -> Musa | due 2026-10-12T15:00:00.000Z (95%)
+10:53:59  [todo created] "Send Musa the price list · due 3 PM" alarm 2:50 PM (time from model)
+10:54:01  [done via voice] Send Musa the price list ("the price list for Musa")
+```
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Run Nectar |
+| `npm run check:g0 -- [--stream 60] [--alarm] [--bedrock]` | Check Bee login, API, live stream, a test alarm, and Bedrock access |
+| `npm run eval [-- --model <id>]` | Score extraction on 10 labeled conversations (gate: 80% correct, under 2 false positives) |
+| `npm run commitments [-- --all]` | List captured commitments |
+| `npm run schedule` | Create to-dos for open commitments that have none |
+| `npm run review [-- --dry-run]` | Run (or preview) the evening review now |
+| `npm test`, `npm run test:coverage`, `npm run typecheck`, `npm run build` | Development |
+
+## Configuration
+
+All settings live in `.env` (see [.env.example](.env.example)); defaults are shown.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `NECTAR_TIMEZONE` | `Africa/Monrovia` | Resolves "Friday" and "by 3 PM" |
+| `NECTAR_MODEL_ID` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Bedrock model or inference profile |
+| `AWS_REGION` | `us-east-1` | Bedrock region |
+| `NECTAR_WINDOW_PAUSE_MS` | `20000` | Silence before a conversation is analyzed |
+| `NECTAR_MIN_CONFIDENCE` / `NECTAR_OPEN_THRESHOLD` | `0.4` / `0.7` | Drop below min; below open becomes "suggested" (no alarm) |
+| `NECTAR_ALARM_LEAD_MIN` | `10` | Alarm before the due time |
+| `NECTAR_WORKDAY_START` / `NECTAR_SAME_DAY_CUTOFF` | `9` / `16` | Untimed promises: due in 2 h before the cutoff, else next workday start |
+| `NECTAR_REVIEW_TIME` | `18:00` | Evening review, or `off` |
+| `NECTAR_RECAP` / `NECTAR_RECAP_LEAD_MIN` | `on` / `10` | Pre-meeting recap |
+| `NECTAR_CATCHUP_MIN` | `5` | How often to fill gaps from the changefeed |
+| `NECTAR_STREAM_MODE` | `cli` | `cli` (`bee stream`) or `sse` (proxy) |
+| `NECTAR_EXTRACTION` / `NECTAR_CREATE_TODOS` | `on` / `on` | Turn off model calls or to-do writes |
+| `NECTAR_LOG_LEVEL` | `info` | `debug` for verbose logs and stack traces |
+
+## Reliability
+
+- **Stream drops:** the live stream reconnects with exponential backoff; catch-up from `/v1/changes` runs at startup and every 5 min, and utterances are de-duplicated, so nothing is analyzed twice.
+- **Proxy dies:** a watchdog checks `bee proxy` every minute and restarts it on the same port.
+- **Bedrock throttling:** retried with backoff; access and credential errors print the exact fix.
+- **No duplicates on the wrist:** existing Bee to-dos and Bee's own suggestions are matched before anything is created.
+- **No alarms in the past:** overdue promises get a 15 min grace period.
+
+## Project layout
 
 | Path | Purpose |
 | --- | --- |
-| `src/bee/client.ts` | Typed client for the Bee proxy API, tolerant of undocumented response shapes |
-| `src/bee/stream.ts` | Live event sources with automatic reconnect and backoff |
-| `src/bee/sse.ts` | Server-Sent Events parser |
-| `src/bee/sync.ts` | Cursor-based catch-up from `/v1/changes` |
-| `src/bee/types.ts` | Bee types and event classification by structural keys |
-| `src/store/db.ts` | SQLite store: events (deduplicated), commitments, cursor |
-| `src/ai/windowing.ts` | Groups utterances per conversation; releases a window after silence |
-| `src/ai/context.ts` | Bee MCP client for facts and today's brief (REST fallback) |
-| `src/ai/prompt.ts` | System prompt, worked examples and the `record_commitments` tool schema |
-| `src/ai/bedrock.ts` | Bedrock Converse client with forced tool use and retries |
-| `src/ai/extractor.ts` | Validates, de-duplicates and filters model output |
+| `src/bee/` | Bee client, live stream sources, SSE parser, catch-up, CLI wrapper, proxy launcher and watchdog |
+| `src/ai/` | Windowing, Bee MCP context, prompt and tool schema, Bedrock client, extractor, evaluation |
+| `src/actions/` | Scheduling and wrist text, to-do scheduler, voice close-out, evening review, pre-meeting recap |
 | `src/pipeline.ts` | Utterances -> windows -> context -> extraction -> store |
-| `src/actions/schedule.ts` | Due-time resolution, alarm time, 80-character wrist text |
-| `src/actions/scheduler.ts` | Creates Bee to-dos; links existing to-dos and Bee suggestions instead of duplicating |
-| `src/actions/closeout.ts` | Voice close-out and sync of to-dos ticked off in Bee |
-| `src/actions/review.ts` | Evening review: sync, carry-over, wrist summary |
-| `src/util/time.ts` | Timezone-aware wall-clock helpers (no dependencies) |
-| `scripts/check-g0.ts` | Phase 0 gate check against your real Bee account (`--bedrock` for model access) |
-| `scripts/eval-extraction.ts` | Phase 2 gate: scores extraction on labeled conversations |
-| `scripts/list-commitments.ts` | Prints captured commitments |
-| `scripts/schedule.ts`, `scripts/review.ts` | Run scheduling or the evening review on demand |
+| `src/store/db.ts` | SQLite (built-in `node:sqlite`): events, commitments, cursors |
+| `scripts/` | Gate checks, evaluation, review and scheduling commands |
+| `test/` | 114 unit tests (Vitest), about 94% line coverage |
 
-## Assumptions to verify with live data
+## Open source: bee-ts
 
-Bee does not publish full response schemas, so these parts are written defensively and should be checked during Phase 0 (`check:g0` prints sample shapes):
+The Bee layer of Nectar is also published as a standalone library, **[bee-ts](https://github.com/Mammajam/bee-ts)** (MIT): a typed client for the Bee proxy API, live stream sources with reconnect, an SSE parser, event classification and changefeed catch-up, with no runtime dependencies. It is the Open Source mini challenge entry.
 
-- The shape of `/v1/changes` and its cursor field (`next_cursor` vs. `cursor`).
-- Where a conversation's utterances live (`utterances` vs. `transcript`).
-- Utterance timestamp field name and unit (used for lag measurement).
+## Notes on Bee's API
 
-Log anything surprising in [FRICTION_LOG.md](FRICTION_LOG.md).
+Bee does not publish full response schemas, so the client accepts several shapes (for list responses, `/v1/changes`, conversation transcripts, and `bee today`). `npm run check:g0` prints sample shapes from your account; anything surprising goes in [FRICTION_LOG.md](FRICTION_LOG.md).
 
 ## Privacy
 
-Bee records the people around you. Ask for consent before recording colleagues, and keep `data/` (your local database) out of version control; it is ignored by default.
+Bee records the people around you. Ask for consent before recording colleagues. All Nectar data stays on your machine in `data/` (ignored by git); only the conversation window being analyzed is sent to Amazon Bedrock.
 
 ## License
 

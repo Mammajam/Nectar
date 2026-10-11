@@ -1,6 +1,6 @@
 {
   "name": "nectar",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Ambient commitment agent for Bee wearable AI: spoken promises become wrist alarms.",
   "type": "module",
   "license": "MIT",
@@ -19,10 +19,12 @@
     "eval": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/eval-extraction.ts",
     "commitments": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/list-commitments.ts",
     "review": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/review.ts",
-    "schedule": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/schedule.ts"
+    "schedule": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/schedule.ts",
+    "test:coverage": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest run --coverage"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^3.2.7",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"

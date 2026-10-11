@@ -26,6 +26,11 @@ export interface Config {
   sameDayCutoffHour: number;
   /** "HH:MM" local time for the evening review, or null when off. */
   reviewTime: string | null;
+  /** F3: pre-meeting recaps from today's calendar. */
+  recapEnabled: boolean;
+  recapLeadMs: number;
+  /** Re-run catch-up this often to fill gaps in the at-most-once stream. */
+  catchUpIntervalMs: number;
 }
 
 export const DEFAULT_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
@@ -88,5 +93,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     workdayStartHour: num(env, 'NECTAR_WORKDAY_START', 9, 0, 23),
     sameDayCutoffHour: num(env, 'NECTAR_SAME_DAY_CUTOFF', 16, 0, 23),
     reviewTime: reviewTime(env.NECTAR_REVIEW_TIME),
+    recapEnabled: (env.NECTAR_RECAP ?? 'on').toLowerCase() !== 'off',
+    recapLeadMs: num(env, 'NECTAR_RECAP_LEAD_MIN', 10, 1, 120) * 60_000,
+    catchUpIntervalMs: num(env, 'NECTAR_CATCHUP_MIN', 5, 1, 1440) * 60_000,
   };
 }
