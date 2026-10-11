@@ -37,6 +37,11 @@ export class CommitmentPipeline {
   }
 
   onEvent(event: BeeEvent, now = Date.now()): void {
+    // A live utterance that only carries a numeric id joins its uuid-keyed conversation.
+    if (event.kind === 'utterance' && event.conversationId) {
+      const key = this.store.conversationKey(event.conversationId);
+      if (key !== event.conversationId) event = { ...event, conversationId: key };
+    }
     for (const w of this.windower.add(event, now)) this.enqueue(w);
   }
 

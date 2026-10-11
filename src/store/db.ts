@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { BeeEvent } from '../bee/types.js';
+import { conversationRefs, type BeeEvent } from '../bee/types.js';
 import type { Commitment } from '../ai/types.js';
 
 const SCHEMA = `
@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS commitments (
   created_at INTEGER NOT NULL,
   due_text TEXT,
   quote TEXT
+);
+
+-- Stream events identify a conversation by uuid; the changefeed and API use a numeric id.
+CREATE TABLE IF NOT EXISTS conversation_ids (
+  id TEXT PRIMARY KEY,
+  uuid TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kv (
@@ -62,13 +68,22 @@ export interface StoredEvent {
 
 const sha1 = (s: string) => createHash('sha1').update(s).digest('hex');
 
-/** Stable key so the same utterance seen via stream and via catch-up is stored once. */
-export function dedupeKey(e: BeeEvent): string {
+export const utteranceKey = (conversation: string | null, speaker: string | undefined, text: string): string =>
+  `utterance:${sha1(`${conversation}|${speaker ?? ''}|${normalize(text)}`)}`;
+
+const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * Stable key so the same utterance seen via stream and via catch-up is stored once.
+ * Stream utterances have no id or timestamp, so the key is conversation + speaker
+ * + normalized text: the same words repeated in one conversation count once.
+ */
+export function dedupeKey(e: BeeEvent, conversationKey: string | null = null): string {
   switch (e.kind) {
     case 'utterance': {
       const u = e.utterance;
       if (u.id !== undefined) return `utterance:${u.id}`;
-      return `utterance:${sha1(`${e.conversationId}|${u.start ?? ''}|${u.speaker ?? ''}|${u.text}`)}`;
+      return utteranceKey(conversationKey ?? e.conversationId, u.speaker, u.text);
     }
     case 'conversation':
       return `conversation:${e.conversation.id}:${sha1(JSON.stringify(e.raw))}`;
@@ -96,7 +111,7 @@ function eventText(e: BeeEvent): string | null {
 
 function conversationIdOf(e: BeeEvent): string | null {
   if (e.kind === 'utterance') return e.conversationId;
-  if (e.kind === 'conversation') return String(e.conversation.id);
+  if (e.kind === 'conversation') return conversationRefs(e.conversation).uuid ?? String(e.conversation.id);
   return null;
 }
 
@@ -109,6 +124,7 @@ export class Store {
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec(SCHEMA);
     this.migrate();
+    this.rewriteConversationIds();
   }
 
   /** Add columns introduced after Phase 1 to databases created earlier. */
@@ -124,15 +140,80 @@ export class Store {
     if (!cols.has('done_via')) this.db.exec('ALTER TABLE commitments ADD COLUMN done_via TEXT');
   }
 
+  /** Remember that numeric conversation `id` and `uuid` are the same conversation. */
+  linkConversation(id: string | number, uuid: string): void {
+    const key = String(id);
+    if (key === uuid) return;
+    const known = this.db.prepare('SELECT uuid FROM conversation_ids WHERE id = ?').get(key) as { uuid: string } | undefined;
+    if (known?.uuid === uuid) return;
+    this.db.prepare('INSERT OR REPLACE INTO conversation_ids (id, uuid) VALUES (?, ?)').run(key, uuid);
+    this.rewriteConversationIds();
+  }
+
+  /** The uuid for a numeric conversation id, if learned. */
+  uuidFor(id: string | number): string | null {
+    const row = this.db.prepare('SELECT uuid FROM conversation_ids WHERE id = ?').get(String(id)) as { uuid: string } | undefined;
+    return row?.uuid ?? null;
+  }
+
+  /** The numeric id for a conversation uuid, if learned. */
+  idFor(uuid: string): string | null {
+    const row = this.db.prepare('SELECT id FROM conversation_ids WHERE uuid = ?').get(uuid) as { id: string } | undefined;
+    return row?.id ?? null;
+  }
+
+  /** Resolve a stored or incoming conversation key to its uuid when one is known. */
+  conversationKey(idOrUuid: string | number): string {
+    return this.uuidFor(idOrUuid) ?? String(idOrUuid);
+  }
+
+  private storedConversationId(e: BeeEvent): string | null {
+    const id = conversationIdOf(e);
+    return id === null ? null : this.conversationKey(id);
+  }
+
+  /** Rewrite numeric conversation ids to uuids wherever the map knows them (idempotent). */
+  private rewriteConversationIds(): void {
+    // Utterances stored under a numeric id carry a key hashed with it; re-key them so
+    // the same words arriving live (uuid) are recognized as already seen.
+    const stale = this.db
+      .prepare(
+        `SELECT e.id, e.payload, m.uuid FROM events e JOIN conversation_ids m ON m.id = e.conversation_id
+         WHERE e.kind = 'utterance'`,
+      )
+      .all() as { id: number; payload: string; uuid: string }[];
+    for (const row of stale) {
+      let u: { id?: unknown; text?: unknown; speaker?: unknown } | undefined;
+      try {
+        u = (JSON.parse(row.payload) as { utterance?: typeof u }).utterance;
+      } catch {
+        continue;
+      }
+      if (!u || u.id !== undefined || typeof u.text !== 'string') continue;
+      const speaker = typeof u.speaker === 'string' ? u.speaker : undefined;
+      this.db.prepare('UPDATE OR IGNORE events SET dedupe_key = ? WHERE id = ?').run(utteranceKey(row.uuid, speaker, u.text), row.id);
+    }
+    this.db.exec(
+      `UPDATE events SET conversation_id = (SELECT uuid FROM conversation_ids WHERE id = events.conversation_id)
+         WHERE conversation_id IN (SELECT id FROM conversation_ids);
+       UPDATE commitments SET source_conversation_id = (SELECT uuid FROM conversation_ids WHERE id = commitments.source_conversation_id)
+         WHERE source_conversation_id IN (SELECT id FROM conversation_ids);`,
+    );
+  }
+
   /** Returns true when the event was new, false when it was a duplicate. */
   insertEvent(e: BeeEvent, now = Date.now()): boolean {
-    if (e.kind === 'connected') return false;
+    if (e.kind === 'connected' || e.kind === 'ignored') return false;
+    if (e.kind === 'conversation') {
+      const { id, uuid } = conversationRefs(e.conversation);
+      if (id && uuid) this.linkConversation(id, uuid);
+    }
     const result = this.db
       .prepare(
         `INSERT OR IGNORE INTO events (kind, conversation_id, text, payload, dedupe_key, received_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(e.kind, conversationIdOf(e), eventText(e), JSON.stringify(e.raw), dedupeKey(e), now);
+      .run(e.kind, this.storedConversationId(e), eventText(e), JSON.stringify(e.raw), dedupeKey(e, e.kind === 'utterance' && e.conversationId ? this.conversationKey(e.conversationId) : null), now);
     return Number(result.changes) > 0;
   }
 

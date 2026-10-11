@@ -32,6 +32,8 @@ function describe(e: BeeEvent): string {
       return `[journal] ${e.text ?? ''}`;
     case 'connected':
       return '[connected]';
+    case 'ignored':
+      return `[${e.name}]`;
     case 'unknown':
       return `[unknown${e.name ? ` ${e.name}` : ''}] ${JSON.stringify(e.raw).slice(0, 160)}`;
   }
@@ -119,7 +121,7 @@ async function main() {
   const runCatchUp = async (label: string) => {
     const r = await catchUp(client, store, (e) => pipeline?.onEvent(e));
     if (label === 'startup' || r.newUtterances > 0) {
-      log.info(`Catch-up (${label}): ${r.changesSeen} changes, ${r.conversationsFetched} conversations, ${r.newUtterances} new utterances`);
+      log.info(`Catch-up (${label}): ${r.changesSeen} changes, ${r.conversationsFetched} conversations${r.conversationsSkipped ? ` (${r.conversationsSkipped} still in progress)` : ''}, ${r.newUtterances} new utterances`);
     }
   };
   await runCatchUp('startup').catch((err) => log.warn(`Catch-up skipped: ${err instanceof Error ? err.message : String(err)}`));

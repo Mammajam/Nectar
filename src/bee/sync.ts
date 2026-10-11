@@ -1,5 +1,5 @@
 import type { BeeClient } from './client.js';
-import { classifyEvent, isObject, type BeeEvent, type BeeUtterance } from './types.js';
+import { classifyEvent, conversationRefs, isObject, type BeeEvent, type BeeUtterance } from './types.js';
 import type { Store } from '../store/db.js';
 
 export const CHANGES_CURSOR_KEY = 'bee.changes.cursor';
@@ -7,6 +7,8 @@ export const CHANGES_CURSOR_KEY = 'bee.changes.cursor';
 export interface CatchUpResult {
   changesSeen: number;
   conversationsFetched: number;
+  /** Conversations not yet COMPLETED; skipped until Bee reports them again. */
+  conversationsSkipped: number;
   newUtterances: number;
   cursor: string | null;
 }
@@ -33,16 +35,29 @@ export async function catchUp(
   onNewEvent?: (event: BeeEvent) => void,
 ): Promise<CatchUpResult> {
   const page = await client.changes(store.get(CHANGES_CURSOR_KEY));
-  const conversationIds = new Set(
-    page.changes.filter((c) => c.type === 'conversation').map((c) => String(c.id)),
-  );
+  const conversationIds = new Set<string>();
+  let skipped = 0;
+  for (const c of page.changes) {
+    if (c.type !== 'conversation') continue;
+    // The changefeed lists conversations still in progress; wait until they are complete.
+    if (c.state !== undefined && c.state.toUpperCase() !== 'COMPLETED') {
+      skipped++;
+      continue;
+    }
+    conversationIds.add(String(c.id));
+  }
 
   let newUtterances = 0;
   for (const id of conversationIds) {
     const conversation = await client.getConversation(id);
+    // One key everywhere: the uuid. Use the learned map first, then the API's own uuid;
+    // fall back to the numeric id only when neither is known.
+    const refs = isObject(conversation) ? conversationRefs(conversation) : { id: null, uuid: null };
+    if (refs.uuid) store.linkConversation(id, refs.uuid);
+    const uuid = store.uuidFor(id) ?? refs.uuid;
     for (const utterance of utterancesOf(conversation)) {
       if (typeof utterance?.text !== 'string') continue;
-      const event = classifyEvent({ utterance, conversation_id: id });
+      const event = classifyEvent(uuid ? { utterance, conversation_uuid: uuid } : { utterance, conversation_id: id });
       if (store.insertEvent(event)) {
         newUtterances++;
         onNewEvent?.(event);
@@ -54,6 +69,7 @@ export async function catchUp(
   return {
     changesSeen: page.changes.length,
     conversationsFetched: conversationIds.size,
+    conversationsSkipped: skipped,
     newUtterances,
     cursor: page.cursor,
   };

@@ -40,30 +40,39 @@ export function toPage<T>(raw: unknown, preferredKey?: string): Page<T> {
 
 const singular = (key: string) => key.replace(/ies$/, 'y').replace(/s$/, '');
 
-/** Normalize `/v1/changes`, which returns changed entity IDs since a cursor. */
+/**
+ * Normalize the changefeed. The documented shape (`bee changed --json`) is
+ * `{ meta: { next_cursor, ... }, conversations: [{ id, state, ... }], facts, todos,
+ * dailies, journals }`. The REST `/v1/changes` shape is not documented, so a flat
+ * `changes` list and top-level cursor keys are still accepted.
+ */
 export function toChangesPage(raw: unknown): ChangesPage {
   const changes: ChangeRef[] = [];
   let cursor: string | null = null;
   if (isObject(raw)) {
-    const c = raw.next_cursor ?? raw.cursor ?? raw.nextCursor;
+    const meta = isObject(raw.meta) ? raw.meta : {};
+    const c = meta.next_cursor ?? raw.next_cursor ?? raw.cursor ?? raw.nextCursor;
     cursor = typeof c === 'string' ? c : typeof c === 'number' ? String(c) : null;
     const list = raw.changes ?? raw.items;
+    const stateOf = (v: Record<string, unknown>) => (typeof v.state === 'string' ? { state: v.state } : {});
     if (Array.isArray(list)) {
       for (const item of list) {
         if (!isObject(item)) continue;
         const type = item.type ?? item.entity ?? item.kind;
         const id = item.id ?? item.entity_id;
         if (typeof type === 'string' && (typeof id === 'string' || typeof id === 'number')) {
-          changes.push({ type: singular(type), id });
+          changes.push({ type: singular(type), id, ...stateOf(item) });
         }
       }
     } else {
-      // Shape like { conversations: [1, 2], todos: [5] }
+      // Documented shape: { conversations: [{ id, state }], todos: [...], ... } (`meta` is not an array).
       for (const [key, value] of Object.entries(raw)) {
         if (!Array.isArray(value)) continue;
         for (const v of value) {
           const id = isObject(v) ? v.id : v;
-          if (typeof id === 'string' || typeof id === 'number') changes.push({ type: singular(key), id });
+          if (typeof id === 'string' || typeof id === 'number') {
+            changes.push({ type: singular(key), id, ...(isObject(v) ? stateOf(v) : {}) });
+          }
         }
       }
     }

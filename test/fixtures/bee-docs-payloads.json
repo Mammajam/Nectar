@@ -1,0 +1,92 @@
+{
+  "_note": "Payload shapes documented by Bee. Field names and nesting come from the cited page; values are illustrative. Anything the docs do not specify is NOT in this file (REST proxy responses, `bee today --json`, the `uuid` of API conversations).",
+  "stream": {
+    "new-utterance": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": {
+        "utterance": { "text": "I'll send Musa the price list by 3 PM", "speaker": "speaker_1" },
+        "conversation_uuid": "3f1c9a52-7d4e-4b1a-9c2e-5a6b7c8d9e01"
+      }
+    },
+    "new-conversation": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "conversation": { "id": 4512, "uuid": "3f1c9a52-7d4e-4b1a-9c2e-5a6b7c8d9e01", "state": "CAPTURING", "title": "Shop morning" } }
+    },
+    "update-conversation": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "conversation": { "id": 4512, "state": "COMPLETED", "title": "Shop morning", "short_summary": "Planned the supplier deliveries." } }
+    },
+    "update-conversation-summary": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "conversation_id": 4512, "short_summary": "Planned the supplier deliveries." }
+    },
+    "delete-conversation": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "conversation": { "id": 4512, "title": "Shop morning" } }
+    },
+    "update-location": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "conversation_id": 4512, "location": { "latitude": 6.3008, "longitude": -10.7969, "name": "Monrovia" } }
+    },
+    "todo-created": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "todo": { "id": 88, "text": "Send Musa the price list · due 3 PM", "completed": false, "alarmAt": 1791818400000 } }
+    },
+    "todo-updated": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "todo": { "id": 88, "text": "Send Musa the price list · due 3 PM", "completed": true, "alarmAt": 1791818400000 } }
+    },
+    "todo-deleted": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "todo": { "id": 88 } }
+    },
+    "journal-created": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "journal": { "id": 991, "state": "READY", "text": "um done with the price list for musa" } }
+    },
+    "journal-updated": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": {
+        "journal": {
+          "id": 991,
+          "state": "READY",
+          "text": "um done with the price list for musa",
+          "aiResponse": {
+            "message": "Nice work.",
+            "cleanedUpText": "Done with the price list for Musa.",
+            "followUp": "Anything else for today?",
+            "todos": ["Call the landlord"]
+          }
+        }
+      }
+    },
+    "journal-deleted": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "journalId": 991, "reason": "user" }
+    },
+    "journal-text": {
+      "source": "https://docs.bee.computer/docs/realtime",
+      "payload": { "journalId": 991, "text": "Done with the price list for Musa" }
+    }
+  },
+  "changefeed": {
+    "source": "https://docs.bee.computer/docs/agentic-sync",
+    "payload": {
+      "meta": {
+        "next_cursor": "v1-1770759786309",
+        "since": 1770723786309,
+        "until": 1770759786309,
+        "updated": true,
+        "timezone": "Africa/Monrovia"
+      },
+      "facts": [{ "id": 17, "text": "Musa is my supplier for rice", "confirmed": true, "timezone": "Africa/Monrovia" }],
+      "todos": [],
+      "dailies": [],
+      "conversations": [
+        { "id": 4512, "short_summary": "Planned the supplier deliveries.", "state": "COMPLETED" },
+        { "id": 4513, "short_summary": "Still talking.", "state": "CAPTURING" }
+      ],
+      "journals": [{ "id": "j-991", "state": "READY", "text": "Done with the price list for Musa" }]
+    }
+  }
+}
