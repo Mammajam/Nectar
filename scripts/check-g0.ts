@@ -62,7 +62,7 @@ async function main() {
     const { stdout } = await run(config.beeBin, ['status']);
     record('Bee login', true, stdout.trim().split('\n')[0] ?? 'ok');
   } catch (e) {
-    record('Bee login', false, 'run: bee login (unlock Developer Mode in the Bee iOS app first)');
+    record('Bee login', false, 'update the Bee iOS app, Settings > tap Version 5 times, then run `bee login` and `bee status`; if still not authenticated, update the app and repeat');
     return;
   }
 

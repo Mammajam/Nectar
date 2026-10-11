@@ -62,10 +62,10 @@ AWS details for the AWS Builder mini challenge: [docs/aws.md](docs/aws.md).
 
 ## Quick start
 
-Requirements: Node.js 22.13+, an Apple Watch running Bee with the Bee iOS app, and an AWS account with Bedrock access. In the Bee iOS app, unlock **Developer Mode** by tapping the version number 5 times.
+Requirements: Node.js 22.13+, an Apple Watch running Bee with the Bee iOS app, and an AWS account with Bedrock access. To unlock **Developer Mode**: update the Bee iOS app to the latest version, open Settings, tap Version 5 times, then run `bee login` and `bee status`. If `bee status` says you are not authenticated, update the app and repeat.
 
 ```bash
-npm i -g @beeai/cli && bee login        # 1. Bee CLI
+npm i -g @beeai/cli && bee login && bee status   # 1. Bee CLI (after Developer Mode, above)
 git clone https://github.com/Mammajam/Nectar.git && cd Nectar && npm install   # 2. Nectar
 cp .env.example .env                     # 3. settings (defaults work)
 npm run check:g0 -- --bedrock --alarm    # 4. check Bee + Bedrock access
@@ -132,7 +132,7 @@ All settings live in `.env` (see [.env.example](.env.example)); defaults are sho
 | `src/pipeline.ts` | Utterances -> windows -> context -> extraction -> store |
 | `src/store/db.ts` | SQLite (built-in `node:sqlite`): events, commitments, cursors |
 | `scripts/` | Gate checks, evaluation, review and scheduling commands |
-| `test/` | 114 unit tests (Vitest), about 94% line coverage |
+| `test/` | 152 tests (Vitest), about 94% line coverage |
 
 ## Open source: bee-ts
 
@@ -140,7 +140,9 @@ The Bee layer of Nectar is also published as a standalone library, **[bee-ts](ht
 
 ## Notes on Bee's API
 
-Bee does not publish full response schemas, so the client accepts several shapes (for list responses, `/v1/changes`, conversation transcripts, and `bee today`). `npm run check:g0` prints sample shapes from your account; anything surprising goes in [FRICTION_LOG.md](FRICTION_LOG.md).
+Bee documents the CLI changefeed (`bee changed --json`) and the `bee stream` payloads ([Realtime](https://docs.bee.computer/docs/realtime), [Agentic Sync](https://docs.bee.computer/docs/agentic-sync)); Nectar's parsing and its test fixtures (`test/fixtures/bee-docs-payloads.json`) follow those pages. The REST proxy's own response shapes and `bee today --json` are not documented, so the client accepts several shapes for list responses, `/v1/changes`, conversation transcripts and `bee today`. `npm run check:g0` prints sample shapes from your account; anything surprising goes in [FRICTION_LOG.md](FRICTION_LOG.md).
+
+**Conversation identity.** Stream events identify a conversation by `conversation_uuid`, while the changefeed and the API use a numeric `id`. Nectar keys conversations by uuid everywhere and keeps an id-to-uuid map in its store, so an utterance seen live and again in catch-up is stored once.
 
 ## Privacy
 
