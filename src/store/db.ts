@@ -45,6 +45,11 @@ export interface StoredCommitment extends Commitment {
   status: CommitmentStatus;
   beeTodoId: string | null;
   createdAt: number;
+  /** When Nectar scheduled it (after resolving "Friday" etc.), epoch ms. */
+  scheduledDueAt: number | null;
+  alarmAt: number | null;
+  doneAt: number | null;
+  doneVia: string | null;
 }
 
 export interface StoredEvent {
@@ -113,6 +118,10 @@ export class Store {
     );
     if (!cols.has('due_text')) this.db.exec('ALTER TABLE commitments ADD COLUMN due_text TEXT');
     if (!cols.has('quote')) this.db.exec('ALTER TABLE commitments ADD COLUMN quote TEXT');
+    if (!cols.has('alarm_at')) this.db.exec('ALTER TABLE commitments ADD COLUMN alarm_at INTEGER');
+    if (!cols.has('scheduled_due_at')) this.db.exec('ALTER TABLE commitments ADD COLUMN scheduled_due_at INTEGER');
+    if (!cols.has('done_at')) this.db.exec('ALTER TABLE commitments ADD COLUMN done_at INTEGER');
+    if (!cols.has('done_via')) this.db.exec('ALTER TABLE commitments ADD COLUMN done_via TEXT');
   }
 
   /** Returns true when the event was new, false when it was a duplicate. */
@@ -166,7 +175,7 @@ export class Store {
   listCommitments(statuses: CommitmentStatus[] = ['open']): StoredCommitment[] {
     const marks = statuses.map(() => '?').join(',');
     const rows = this.db
-      .prepare(`SELECT * FROM commitments WHERE status IN (${marks}) ORDER BY COALESCE(due_at, 9e15), id`)
+      .prepare(`SELECT * FROM commitments WHERE status IN (${marks}) ORDER BY COALESCE(scheduled_due_at, due_at, 9e15), id`)
       .all(...statuses) as Record<string, unknown>[];
     return rows.map((r) => ({
       id: Number(r.id),
@@ -180,7 +189,42 @@ export class Store {
       status: r.status as CommitmentStatus,
       beeTodoId: (r.bee_todo_id as string | null) ?? null,
       createdAt: Number(r.created_at),
+      scheduledDueAt: r.scheduled_due_at == null ? null : Number(r.scheduled_due_at),
+      alarmAt: r.alarm_at == null ? null : Number(r.alarm_at),
+      doneAt: r.done_at == null ? null : Number(r.done_at),
+      doneVia: (r.done_via as string | null) ?? null,
     }));
+  }
+
+  getCommitment(id: number): StoredCommitment | null {
+    return this.listCommitments(['open', 'suggested', 'done', 'dismissed']).find((c) => c.id === id) ?? null;
+  }
+
+  findByTodoId(beeTodoId: string): StoredCommitment | null {
+    return this.listCommitments(['open', 'suggested', 'done', 'dismissed']).find((c) => c.beeTodoId === beeTodoId) ?? null;
+  }
+
+  /** Open commitments that do not have a Bee to-do yet. */
+  unscheduled(): StoredCommitment[] {
+    return this.listCommitments(['open']).filter((c) => c.beeTodoId === null);
+  }
+
+  markScheduled(id: number, beeTodoId: string, dueAt: Date, alarmAt: Date): void {
+    this.db
+      .prepare('UPDATE commitments SET bee_todo_id = ?, scheduled_due_at = ?, alarm_at = ? WHERE id = ?')
+      .run(beeTodoId, dueAt.getTime(), alarmAt.getTime(), id);
+  }
+
+  reschedule(id: number, dueAt: Date, alarmAt: Date): void {
+    this.db.prepare('UPDATE commitments SET scheduled_due_at = ?, alarm_at = ? WHERE id = ?').run(dueAt.getTime(), alarmAt.getTime(), id);
+  }
+
+  markDone(id: number, via: string, now = Date.now()): void {
+    this.db.prepare("UPDATE commitments SET status = 'done', done_at = ?, done_via = ? WHERE id = ?").run(now, via, id);
+  }
+
+  setStatus(id: number, status: CommitmentStatus): void {
+    this.db.prepare('UPDATE commitments SET status = ? WHERE id = ?').run(status, id);
   }
 
   get(key: string): string | null {

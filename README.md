@@ -13,7 +13,7 @@ Built for the Amazon Developer *Build, Ship, Shape* hackathon, Bee (Wearable AI)
 | 0 | Access and foundations: repo, config, gate-check script | Done (run `npm run check:g0` on your machine) |
 | 1 | Bee data layer: API client, live stream, catch-up, SQLite store | Done |
 | 2 | Commitment extraction with Amazon Bedrock + Bee MCP context | Done; run `npm run eval` for gate G2 |
-| 3 | To-do + wrist alarm, evening review, voice close-out | Planned |
+| 3 | To-do + wrist alarm, evening review, voice close-out | Done; verify live for gate G3 |
 | 4 | Hardening, tests, optional features | Planned |
 | 5 | Demo video and submission | Planned |
 
@@ -32,8 +32,19 @@ All Bee access goes through the official CLI, [`@beeai/cli`](https://docs.bee.co
 ```
 Apple Watch (Bee) -> Bee iOS app -> Bee cloud -> bee CLI (proxy + stream + MCP) -> Nectar
 Nectar: utterances -> 20 s windows -> Amazon Bedrock (Converse, forced tool) -> commitments (SQLite)
-Phase 3: commitments -> POST /v1/todos (alarm_at) -> alarm on the watch
+Nectar: open commitments -> POST /v1/todos (alarm_at, 10 min early) -> alarm on the watch
+Close the loop: voice note "done with X" or ticking the to-do -> commitment done; 6 PM review -> summary on the wrist
 ```
+
+## The wrist loop (Phase 3)
+
+| Step | What happens | Code |
+| --- | --- | --- |
+| Schedule | Due time from the model, else from the spoken words ("tonight", "Thursday morning", "by 3"), else the next work block (2 h later, or 9 AM after 4 PM) | `src/actions/schedule.ts` |
+| De-dupe | Links to a matching open Bee to-do, or accepts Bee's own matching suggestion, before creating anything | `src/actions/scheduler.ts` |
+| Nudge | Bee to-do with `alarm_at` 10 min before due; text under 80 characters, e.g. `Send Musa the price list · due 3 PM` | `src/actions/scheduler.ts` |
+| Close out | A voice note ("done with the price list", "I've sent Musa the order") completes the matching to-do; ticking it in Bee marks it done in Nectar | `src/actions/closeout.ts` |
+| Review | At 6 PM: sync completion from Bee, flag items the daily summary suggests are done, move unfinished ones to 9 AM tomorrow, and put `Nectar: 2/3 kept today. Open: ...` on the wrist | `src/actions/review.ts` |
 
 AWS details for the AWS Builder mini challenge: [docs/aws.md](docs/aws.md).
 
@@ -72,7 +83,12 @@ Requirements: Node.js 22.13+ (uses the built-in `node:sqlite`), an Apple Watch r
    ```
    [commitment open] Send Musa the price list -> Musa | due 2026-10-12T15:00:00.000Z (95%)
    ```
-   List what it has captured with `npm run commitments`.
+   List what it has captured with `npm run commitments`. Other commands:
+   ```bash
+   npm run schedule            # create to-dos for open commitments that have none
+   npm run review -- --dry-run # preview the evening review
+   npm run review              # run it now
+   ```
 
 ## Development
 
@@ -96,9 +112,15 @@ npm run build     # compile to dist/
 | `src/ai/bedrock.ts` | Bedrock Converse client with forced tool use and retries |
 | `src/ai/extractor.ts` | Validates, de-duplicates and filters model output |
 | `src/pipeline.ts` | Utterances -> windows -> context -> extraction -> store |
+| `src/actions/schedule.ts` | Due-time resolution, alarm time, 80-character wrist text |
+| `src/actions/scheduler.ts` | Creates Bee to-dos; links existing to-dos and Bee suggestions instead of duplicating |
+| `src/actions/closeout.ts` | Voice close-out and sync of to-dos ticked off in Bee |
+| `src/actions/review.ts` | Evening review: sync, carry-over, wrist summary |
+| `src/util/time.ts` | Timezone-aware wall-clock helpers (no dependencies) |
 | `scripts/check-g0.ts` | Phase 0 gate check against your real Bee account (`--bedrock` for model access) |
 | `scripts/eval-extraction.ts` | Phase 2 gate: scores extraction on labeled conversations |
 | `scripts/list-commitments.ts` | Prints captured commitments |
+| `scripts/schedule.ts`, `scripts/review.ts` | Run scheduling or the evening review on demand |
 
 ## Assumptions to verify with live data
 

@@ -8,6 +8,14 @@ describe('loadConfig', () => {
     expect(c.streamTypes).toEqual(DEFAULT_STREAM_TYPES);
   });
 
+  it('reads Phase 3 settings', () => {
+    expect(loadConfig({}).reviewTime).toBe('18:00');
+    expect(loadConfig({ NECTAR_REVIEW_TIME: 'off' }).reviewTime).toBeNull();
+    expect(loadConfig({ NECTAR_REVIEW_TIME: '7:30' }).reviewTime).toBe('07:30');
+    expect(loadConfig({ NECTAR_ALARM_LEAD_MIN: '30' }).alarmLeadMs).toBe(1_800_000);
+    expect(() => loadConfig({ NECTAR_REVIEW_TIME: '25:00' })).toThrow();
+  });
+
   it('rejects bad values', () => {
     expect(() => loadConfig({ BEE_PROXY_PORT: 'abc' })).toThrow();
     expect(() => loadConfig({ NECTAR_STREAM_MODE: 'ws' })).toThrow();

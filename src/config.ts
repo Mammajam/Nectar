@@ -18,6 +18,14 @@ export interface Config {
   windowPauseMs: number;
   /** Set NECTAR_EXTRACTION=off to run Phase 1 only (no model calls). */
   extractionEnabled: boolean;
+  /** Phase 3: create Bee to-dos with alarms for open commitments. */
+  createTodos: boolean;
+  alarmLeadMs: number;
+  workdayStartHour: number;
+  /** After this hour, untimed promises roll to the next morning. */
+  sameDayCutoffHour: number;
+  /** "HH:MM" local time for the evening review, or null when off. */
+  reviewTime: string | null;
 }
 
 export const DEFAULT_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
@@ -38,6 +46,14 @@ export const DEFAULT_STREAM_TYPES = [
   'todo-created',
   'todo-updated',
 ];
+
+function reviewTime(raw: string | undefined): string | null {
+  if (raw === undefined || raw === '') return '18:00';
+  if (raw.toLowerCase() === 'off') return null;
+  const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) throw new Error(`NECTAR_REVIEW_TIME must be HH:MM or "off", got "${raw}"`);
+  return `${m[1]!.padStart(2, '0')}:${m[2]}`;
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const proxyPort = Number(env.BEE_PROXY_PORT ?? 8787);
@@ -67,5 +83,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     openThreshold: num(env, 'NECTAR_OPEN_THRESHOLD', 0.7, 0, 1),
     windowPauseMs: num(env, 'NECTAR_WINDOW_PAUSE_MS', 20_000, 1000, 600_000),
     extractionEnabled: (env.NECTAR_EXTRACTION ?? 'on').toLowerCase() !== 'off',
+    createTodos: (env.NECTAR_CREATE_TODOS ?? 'on').toLowerCase() !== 'off',
+    alarmLeadMs: num(env, 'NECTAR_ALARM_LEAD_MIN', 10, 0, 240) * 60_000,
+    workdayStartHour: num(env, 'NECTAR_WORKDAY_START', 9, 0, 23),
+    sameDayCutoffHour: num(env, 'NECTAR_SAME_DAY_CUTOFF', 16, 0, 23),
+    reviewTime: reviewTime(env.NECTAR_REVIEW_TIME),
   };
 }
