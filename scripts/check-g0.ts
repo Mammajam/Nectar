@@ -1,11 +1,12 @@
 /**
  * Phase 0 gate check. Run on your Mac after `bee login`:
  *   npm run check:g0                  read-only checks
- *   npm run check:g0 -- --stream 60   also listen 60 s and talk near your watch
+ *   npm run check:g0 -- --stream 60   also listen 60 s: say a sentence, press Enter, and it times the lag
  *   npm run check:g0 -- --alarm       also create a test todo with an alarm 5 min ahead
  *   npm run check:g0 -- --bedrock     also make one Bedrock call with NECTAR_MODEL_ID
  */
 import { execFile } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { BedrockStructuredLlm } from '../src/ai/bedrock.js';
 import { BeeClient } from '../src/bee/client.js';
@@ -13,6 +14,7 @@ import { ensureProxy } from '../src/bee/proxy.js';
 import { CliStreamSource } from '../src/bee/stream.js';
 import { loadConfig } from '../src/config.js';
 import { loadDotEnv } from '../src/env.js';
+import { LagMeter } from '../src/util/lag.js';
 
 const run = promisify(execFile);
 const args = process.argv.slice(2);
@@ -101,24 +103,32 @@ async function main() {
   }
 
   if (streamSeconds > 0) {
-    console.log(`\nListening ${streamSeconds}s on bee stream. Talk near your watch...`);
+    console.log(`\nListening ${streamSeconds}s on bee stream. Say a sentence near your watch, then press Enter.`);
+    console.log('      (Stream utterances have no timestamp, so lag is timed from your Enter key.)');
     let utterances = 0;
-    const lags: number[] = [];
+    let withUuid = 0;
+    const lag = new LagMeter();
+    const rl = process.stdin.isTTY ? createInterface({ input: process.stdin }) : null;
+    rl?.on('line', () => lag.press());
     const source = new CliStreamSource(config.beeBin, ['new-utterance']);
     source.start({
       onEvent: (e) => {
         if (e.kind !== 'utterance') return;
         utterances++;
-        console.log(`      heard: ${e.utterance.text}`);
-        const t = Number(e.utterance.start ?? e.raw.timestamp ?? NaN);
-        if (Number.isFinite(t) && t > 1e12) lags.push(Date.now() - t);
+        if (typeof e.raw.conversation_uuid === 'string') withUuid++;
+        const ms = lag.heard();
+        console.log(`      heard: ${e.utterance.text}${ms !== null ? ` (${(ms / 1000).toFixed(1)} s after Enter)` : ''}`);
       },
       onError: (err) => console.log(`      stream error: ${err instanceof Error ? err.message : String(err)}`),
     });
     await new Promise((r) => setTimeout(r, streamSeconds * 1000));
     await source.stop();
-    const lag = lags.length ? `${Math.round(lags.reduce((a, b) => a + b, 0) / lags.length / 1000)} s avg lag` : 'lag unknown';
-    record('Live utterances', utterances > 0, `${utterances} heard, ${lag}`);
+    rl?.close();
+    const timing = rl ? lag.summary() : 'lag not measured (stdin is not interactive)';
+    record('Live utterances', utterances > 0, `${utterances} heard, ${timing}`);
+    if (utterances > 0) {
+      record('Utterances carry conversation_uuid', withUuid === utterances, `${withUuid} of ${utterances}`);
+    }
   }
 
   proxy.stop();

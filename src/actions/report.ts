@@ -6,6 +6,7 @@ export function describeScheduled(r: ScheduledResult, now: Date, timezone: strin
   if (r.outcome === 'failed') {
     return `[todo failed] ${r.commitment.what}: ${r.error instanceof Error ? r.error.message : String(r.error)}`;
   }
+  if (r.outcome === 'deferred') return `[todo waiting] "${r.commitment.what}": Bee announced the same to-do from a voice note`;
   const label = { created: 'todo created', 'linked-existing': 'todo linked', 'accepted-suggestion': 'suggestion accepted' }[r.outcome];
   return `[${label}] "${r.text}" alarm ${shortWhen(r.alarmAt, now, timezone)} (time from ${r.source})`;
 }

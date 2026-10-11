@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { conversationRefs, type BeeEvent } from '../bee/types.js';
+import { classifyEvent, conversationRefs, type BeeEvent } from '../bee/types.js';
 import type { Commitment } from '../ai/types.js';
 
 const SCHEMA = `
@@ -215,6 +215,24 @@ export class Store {
       )
       .run(e.kind, this.storedConversationId(e), eventText(e), JSON.stringify(e.raw), dedupeKey(e, e.kind === 'utterance' && e.conversationId ? this.conversationKey(e.conversationId) : null), now);
     return Number(result.changes) > 0;
+  }
+
+  /** To-dos Bee itself proposed from voice notes (`aiResponse.todos`) received since `sinceMs`. */
+  recentJournalTodos(sinceMs: number): { text: string; receivedAt: number }[] {
+    const rows = this.db
+      .prepare("SELECT payload, received_at FROM events WHERE kind = 'journal' AND received_at >= ? ORDER BY id")
+      .all(sinceMs) as { payload: string; received_at: number }[];
+    const out: { text: string; receivedAt: number }[] = [];
+    for (const r of rows) {
+      let e: BeeEvent;
+      try {
+        e = classifyEvent(JSON.parse(r.payload));
+      } catch {
+        continue;
+      }
+      if (e.kind === 'journal') for (const text of e.aiTodos) out.push({ text, receivedAt: Number(r.received_at) });
+    }
+    return out;
   }
 
   utterances(conversationId: string, limit = 200): StoredEvent[] {

@@ -7,7 +7,7 @@ import { scheduleCommitment, wristText, type ScheduleOptions } from './schedule.
 
 export interface ScheduledResult {
   commitment: StoredCommitment;
-  outcome: 'created' | 'linked-existing' | 'accepted-suggestion' | 'failed';
+  outcome: 'created' | 'linked-existing' | 'accepted-suggestion' | 'deferred' | 'failed';
   todoId: string | null;
   text: string;
   dueAt: Date;
@@ -19,6 +19,10 @@ export interface ScheduledResult {
 export interface TodoSchedulerOptions extends ScheduleOptions {
   /** Token overlap at or above which an existing Bee to-do counts as the same task. */
   matchThreshold?: number;
+  /** How far back a voice note's `aiResponse.todos` still counts as Bee's own to-do. */
+  journalLookbackMs?: number;
+  /** How long to wait for Bee to create a to-do it announced in a voice note before creating ours. */
+  journalGraceMs?: number;
   now?: () => Date;
 }
 
@@ -72,6 +76,25 @@ export class TodoScheduler {
           this.store.markScheduled(c.id, String(existing.id), s.dueAt, s.alarmAt);
           results.push({ ...base, outcome: 'linked-existing', todoId: String(existing.id) });
           continue;
+        }
+        // Bee may have created its own to-do from a voice note (`aiResponse.todos`).
+        const announced = this.store
+          .recentJournalTodos(now.getTime() - (this.opts.journalLookbackMs ?? 24 * 3_600_000))
+          .filter((j) => overlap(j.text, c.what) >= this.matchThreshold);
+        if (announced.length) {
+          const theirs = openTodos.find((t) => announced.some((j) => overlap(t.text, j.text) >= this.matchThreshold));
+          if (theirs) {
+            await this.client.updateTodo(theirs.id, { alarmAt: s.alarmAt });
+            this.store.markScheduled(c.id, String(theirs.id), s.dueAt, s.alarmAt);
+            results.push({ ...base, outcome: 'linked-existing', todoId: String(theirs.id) });
+            continue;
+          }
+          // Not in the list yet: give Bee a moment before adding a second to-do.
+          const newest = Math.max(...announced.map((j) => j.receivedAt));
+          if (now.getTime() - newest < (this.opts.journalGraceMs ?? 120_000)) {
+            results.push({ ...base, outcome: 'deferred', todoId: null });
+            continue;
+          }
         }
         const suggestion = suggestions.find((x) => overlap(x.text, c.what) >= this.matchThreshold);
         if (suggestion && this.cli) {

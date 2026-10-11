@@ -84,6 +84,7 @@ async function main() {
   const closeOut = new CloseOutHandler(client, store);
   if (!config.createTodos) log.info('To-do creation off (NECTAR_CREATE_TODOS=off): commitments are stored only');
   scheduleNow(); // anything left from a previous run
+  if (scheduler) timers.push(setInterval(scheduleNow, 60_000)); // retry commitments waiting on Bee's own to-do
 
   // Phase 2: commitment extraction ------------------------------------------
   let pipeline: CommitmentPipeline | null = null;
