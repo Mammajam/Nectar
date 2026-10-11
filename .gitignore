@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+data/
+bee-sync/
+*.db
+*.db-*
+.DS_Store
