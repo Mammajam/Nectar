@@ -94,7 +94,7 @@ export class BeeClient {
     }
     const res = await this.fetchImpl(url, {
       method,
-      headers: body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' },
+      headers: body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json; charset=utf-8' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();

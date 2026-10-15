@@ -13,11 +13,21 @@ export interface CatchUpResult {
   cursor: string | null;
 }
 
-/** Find the utterance list in a conversation response (shape not documented). */
-export function utterancesOf(conversation: unknown): BeeUtterance[] {
+/** The conversation object itself: the API wraps it as `{ conversation, timezone }`. */
+export function conversationOf(response: unknown): unknown {
+  return isObject(response) && isObject(response.conversation) ? response.conversation : response;
+}
+
+/** Find the utterance list in a conversation response (the live API nests it under `transcriptions`). */
+export function utterancesOf(response: unknown): BeeUtterance[] {
+  const conversation = conversationOf(response);
   if (!isObject(conversation)) return [];
   const direct = conversation.utterances;
   if (Array.isArray(direct)) return direct as BeeUtterance[];
+  const transcriptions = conversation.transcriptions;
+  if (Array.isArray(transcriptions)) {
+    return transcriptions.flatMap((t) => (isObject(t) && Array.isArray(t.utterances) ? (t.utterances as BeeUtterance[]) : []));
+  }
   const transcript = conversation.transcript;
   if (isObject(transcript) && Array.isArray(transcript.utterances)) return transcript.utterances as BeeUtterance[];
   if (Array.isArray(transcript)) return transcript as BeeUtterance[];
@@ -52,7 +62,8 @@ export async function catchUp(
     const conversation = await client.getConversation(id);
     // One key everywhere: the uuid. Use the learned map first, then the API's own uuid;
     // fall back to the numeric id only when neither is known.
-    const refs = isObject(conversation) ? conversationRefs(conversation) : { id: null, uuid: null };
+    const detail = conversationOf(conversation);
+    const refs = isObject(detail) ? conversationRefs(detail) : { id: null, uuid: null };
     if (refs.uuid) store.linkConversation(id, refs.uuid);
     const uuid = store.uuidFor(id) ?? refs.uuid;
     for (const utterance of utterancesOf(conversation)) {
