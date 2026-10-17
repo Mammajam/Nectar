@@ -96,17 +96,29 @@ export class SseStreamSource extends ReconnectingSource {
 
 export type SpawnFn = (cmd: string, args: string[]) => ChildProcess;
 
+const defaultSpawn: SpawnFn = (cmd, args) => nodeSpawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
+
 /** Live events from `bee stream --json` (one JSON object per line). */
 export class CliStreamSource extends ReconnectingSource {
   private child: ChildProcess | null = null;
+  private readonly spawn: SpawnFn;
+  private readonly killGroup: boolean;
 
+  /**
+   * `bee` is a wrapper that starts the real stream process, so signalling only the
+   * wrapper leaves the stream orphaned with its pipe open. The default spawn puts the
+   * child in its own process group and `abort` signals the whole group.
+   */
   constructor(
     private readonly beeBin: string,
     private readonly types: string[],
-    private readonly spawn: SpawnFn = (cmd, args) => nodeSpawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] }),
+    spawn?: SpawnFn,
     baseDelayMs = 1000,
+    killGroup = spawn === undefined && process.platform !== 'win32',
   ) {
     super();
+    this.spawn = spawn ?? defaultSpawn;
+    this.killGroup = killGroup;
     this.baseDelayMs = baseDelayMs;
   }
 
@@ -152,6 +164,13 @@ export class CliStreamSource extends ReconnectingSource {
   }
 
   protected abort(): void {
-    this.child?.kill('SIGTERM');
+    const child = this.child;
+    if (!child) return;
+    try {
+      if (this.killGroup && child.pid) process.kill(-child.pid, 'SIGTERM');
+      else child.kill('SIGTERM');
+    } catch {
+      child.kill('SIGTERM'); // group already gone
+    }
   }
 }
