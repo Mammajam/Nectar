@@ -1,0 +1,14 @@
+*{box-sizing:border-box;margin:0}
+body{font-family:-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;background:#14110b;color:#fff7e0;overflow:hidden}
+.mono{font-family:"SF Mono",Menlo,monospace}
+.term{background:#0d0b07;border:1px solid #3a3020;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px #0008}
+.bar{background:#241d11;padding:14px 18px;display:flex;gap:9px;align-items:center;color:#a89a78;font-size:18px}
+.bar i{width:14px;height:14px;border-radius:50%;display:block}
+.ln{padding:6px 24px;font-size:23px;line-height:1.45;color:#d8cba8;white-space:nowrap}
+.t{color:#7a6d4c}.tag{color:#f5b41b;font-weight:600}.ok{color:#7ddc8a}.dim{color:#9a8c68}
+.watch{width:300px;height:360px;background:#000;border-radius:78px;border:10px solid #2a2a2e;padding:34px 24px;box-shadow:0 30px 60px #000a;position:relative}
+.watch .app{display:flex;align-items:center;gap:8px;color:#f5b41b;font-size:19px;font-weight:600;margin-bottom:14px}
+.watch .dot{width:20px;height:20px;border-radius:6px;background:#f5b41b}
+.watch .ti{font-size:27px;font-weight:600;line-height:1.2;color:#fff}
+.watch .su{font-size:19px;color:#b9b9c0;margin-top:12px;line-height:1.3}
+.hex{position:absolute;opacity:.07;width:420px}

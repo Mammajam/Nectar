@@ -147,6 +147,10 @@ Bee documents the CLI changefeed (`bee changed --json`) and the `bee stream` pay
 
 **Conversation identity.** Stream events identify a conversation by `conversation_uuid`, while the changefeed and the API use a numeric `id`. Nectar keys conversations by uuid everywhere and keeps an id-to-uuid map in its store, so an utterance seen live and again in catch-up is stored once.
 
+## Agent skill
+
+The project ships Bee's official CLI skill (`.claude/skills/bee-cli/SKILL.md`, from [bee-computer/bee-skill](https://github.com/bee-computer/bee-skill), MIT) so a coding agent working in this repo knows the `bee` commands Nectar relies on: `bee now`, `bee todos`, `bee facts`, `bee search`. It is documentation only: no scripts, and it needs the Bee CLI login you already have. To update it, copy the latest `bee-cli/SKILL.md` from that repository over the local file.
+
 ## Privacy
 
 Bee records the people around you. Ask for consent before recording colleagues. All Nectar data stays on your machine in `data/` (ignored by git); only the conversation window being analyzed is sent to the configured model provider: Amazon Bedrock by default, Anthropic's API if `NECTAR_PROVIDER=anthropic`, or nothing at all outside your machine with a local `openai`-compatible server such as Ollama.

@@ -45,6 +45,25 @@ describe('AnthropicStructuredLlm', () => {
     });
   });
 
+  it('drops temperature once for a model that rejects it, then keeps leaving it out', async () => {
+    const ok = () => reply(200, { content: [{ type: 'tool_use', name: 'record_commitments', input: { ok: true } }] });
+    const f = sequence(reply(400, '{"error":{"message":"`temperature` is deprecated for this model."}}'), ok(), ok());
+    const llm = new AnthropicStructuredLlm('claude-haiku-5-5', { apiKey: 'k', fetchImpl: asFetch(f), baseDelayMs: 1 });
+    expect(await llm.structured(req)).toEqual({ ok: true });
+    expect(bodyOf(f, 0)).toHaveProperty('temperature', 0);
+    expect(bodyOf(f, 1)).not.toHaveProperty('temperature');
+    await llm.structured(req);
+    expect(f).toHaveBeenCalledTimes(3);
+    expect(bodyOf(f, 2)).not.toHaveProperty('temperature');
+  });
+
+  it('does not swallow other 400 errors', async () => {
+    const f = sequence(reply(400, '{"error":{"message":"max_tokens too large"}}'));
+    const llm = new AnthropicStructuredLlm('m', { apiKey: 'k', fetchImpl: asFetch(f), baseDelayMs: 1 });
+    await expect(llm.structured(req)).rejects.toThrow(/400/);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
   it('retries throttling and overload, then succeeds', async () => {
     const f = sequence(reply(429, 'slow down'), reply(529, 'overloaded'), reply(200, { content: [{ type: 'tool_use', name: 'record_commitments', input: { ok: true } }] }));
     const llm = new AnthropicStructuredLlm('m', { apiKey: 'k', fetchImpl: asFetch(f), baseDelayMs: 1 });
