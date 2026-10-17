@@ -20,6 +20,11 @@ Nectar uses **Amazon Bedrock** as its reasoning layer. Every commitment shown on
 
 Temperature is 0 for repeatable output. The current time and timezone are sent with every request so the model resolves "Friday" or "by 3 PM" to a timestamp.
 
+## What this does not use
+
+- **Strands Agents SDK / AgentCore:** not used. Nectar calls the Bedrock Converse API directly with a forced tool choice, so each window is one structured model call inside a multi-step pipeline (window, context, extract, resolve time, de-duplicate, write). There is no agent loop.
+- **Bee MCP tools chosen by the model:** the model does not call tools. Nectar reads facts and today's brief from `bee mcp serve` itself, before the call, and puts them in the prompt.
+
 ## Setup
 
 1. Configure credentials (`aws configure` or `AWS_PROFILE`) with `bedrock:InvokeModel` permission.
@@ -30,6 +35,8 @@ Temperature is 0 for repeatable output. The current time and timezone are sent w
 ## Evaluation
 
 `npm run eval` runs 10 labeled conversations (`test/fixtures/eval-set.json`): 6 with 8 promises in total, and 4 without (requests to others, small talk, past actions, vague intentions). Gate G2 passes at 80% of commitments correct (action, person, local due date) with fewer than 2 false positives.
+
+Record each run of `npm run eval` here (the Bedrock results have not been recorded yet):
 
 | Date | Model | Correct | False positives | Notes |
 | --- | --- | --- | --- | --- |

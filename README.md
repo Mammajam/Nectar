@@ -134,9 +134,9 @@ All settings live in `.env` (see [.env.example](.env.example)); defaults are sho
 | `scripts/` | Gate checks, evaluation, review and scheduling commands |
 | `test/` | 152 tests (Vitest), about 94% line coverage |
 
-## Open source: bee-ts
+## The Bee layer
 
-The Bee layer of Nectar is also published as a standalone library, **[bee-ts](https://github.com/Mammajam/bee-ts)** (MIT): a typed client for the Bee proxy API, live stream sources with reconnect, an SSE parser, event classification and changefeed catch-up, with no runtime dependencies. It is the Open Source mini challenge entry.
+Everything that talks to Bee lives in `src/bee/` and is independent of the rest of Nectar: a typed client for the proxy API, live stream sources with reconnect (CLI and SSE), an SSE parser, event classification for the documented payloads, and changefeed catch-up. It uses only Node built-ins, a small backoff helper (`src/util/backoff.ts`) and, for catch-up, the `Store` interface. It is not published as a separate package.
 
 ## Notes on Bee's API
 
