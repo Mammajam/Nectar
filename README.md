@@ -6,13 +6,15 @@ Nectar is an ambient commitment agent for [Bee](https://docs.bee.computer/docs),
 
 Built for the Amazon Developer *Build, Ship, Shape* hackathon: **Bee (Wearable AI)** track, with the **AWS Builder** mini challenge.
 
+> **Model provider.** The demo video and the numbers below run on the **Anthropic API** (`claude-haiku-5-5`). The new AWS account's Bedrock quotas stayed at 0 during the hackathon (see [FRICTION_LOG.md](FRICTION_LOG.md)), so the Bedrock path (`NECTAR_PROVIDER=bedrock`) is implemented and unit-tested but was not exercised live. AWS details: [docs/aws.md](docs/aws.md).
+
 ![CI](https://github.com/Mammajam/Nectar/actions/workflows/ci.yml/badge.svg)
 
 ## What it does
 
 | Moment | What Nectar does | On the wrist |
 | --- | --- | --- |
-| You make a promise in conversation | Detects it with a language model (Amazon Bedrock by default), using your Bee facts and today's brief for names and times | — |
+| You make a promise in conversation | Detects it with Claude Haiku (the Anthropic API, or Amazon Bedrock), using your Bee facts and today's brief for names and times | — |
 | Seconds later | Creates a Bee to-do with an alarm 10 min before it's due (or links an existing to-do or Bee suggestion) | `Send Musa the price list · due 3 PM` |
 | 10 min before a meeting | Lists what you still owe the people you're about to meet | `10 AM Supplier call: you owe Send Musa the price list +1` |
 | You say "done with the price list" | Completes the matching to-do | to-do checked off |
@@ -35,7 +37,7 @@ flowchart LR
   end
   CLI --> S
   CLI -- facts, today --> EX
-  EX <--> BR[Amazon Bedrock<br/>Claude Haiku]
+  EX <--> BR[Claude Haiku<br/>Anthropic API or Amazon Bedrock]
   SCH -- to-do + alarm --> CLI
   REC -- recap to-do --> CLI
   REV -- summary to-do --> CLI
@@ -62,13 +64,13 @@ AWS details for the AWS Builder mini challenge: [docs/aws.md](docs/aws.md).
 
 ## Quick start
 
-Requirements: Node.js 22.13+, an Apple Watch running Bee with the Bee iOS app, and an AWS account with Bedrock access. To unlock **Developer Mode**: update the Bee iOS app to the latest version, open Settings, tap Version 5 times, then run `bee login` and `bee status`. If `bee status` says you are not authenticated, update the app and repeat.
+Requirements: Node.js 22.13+, an Apple Watch running Bee with the Bee iOS app, and either an Anthropic API key or an AWS account with Bedrock access. To unlock **Developer Mode**: update the Bee iOS app to the latest version, open Settings, tap Version 5 times, then run `bee login` and `bee status`. If `bee status` says you are not authenticated, update the app and repeat.
 
 ```bash
 npm i -g @beeai/cli && bee login && bee status   # 1. Bee CLI (after Developer Mode, above)
 git clone https://github.com/Mammajam/Nectar.git && cd Nectar && npm install   # 2. Nectar
 cp .env.example .env                     # 3. settings (defaults work)
-npm run check:g0 -- --bedrock --alarm    # 4. check Bee + Bedrock access
+npm run check:g0 -- --bedrock --alarm    # 4. check Bee + the model API (despite the flag name, it checks your NECTAR_PROVIDER)
 npm run dev                              # 5. run it
 ```
 

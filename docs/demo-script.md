@@ -7,7 +7,7 @@ Replaces the "console" scenes of the original script. Everything judges need to 
 ## Setup
 
 - **Layout:** terminal on the left (font 18-20 pt, dark theme, 1080p), watch on the right (second camera, or the iPhone's Bee to-do list mirrored). Terminal started with `npm run dev` before recording; clear the screen first.
-- **Config for filming:** `NECTAR_TIMEZONE=Africa/Monrovia`, `NECTAR_LOG_LEVEL=info`, `NECTAR_REVIEW_TIME=off` (the review is run by hand in scene 6).
+- **Config for filming:** `NECTAR_PROVIDER=anthropic`, `NECTAR_MODEL_ID=claude-haiku-5-5`, `NECTAR_TIMEZONE=Africa/Monrovia`, `NECTAR_LOG_LEVEL=info`, `NECTAR_REVIEW_TIME=off` (the review is run by hand in scene 6).
 - **Calendar:** one real event about 12 minutes ahead, titled with the person you owe (for example "Supplier call: Musa"), present in `bee today`. Scene 4 depends on it.
 - **Never on screen:** `.env`, AWS credentials, the Bee token, other people's names beyond what they consented to.
 
@@ -26,13 +26,13 @@ Replaces the "console" scenes of the original script. Everything judges need to 
 | 1:20-1:50 | **3. Pre-meeting recap** | VO: "Ten minutes before the call, it reminds me what I owe the person I'm about to meet." | `[recap] "10 AM Supplier call: you owe Send Musa the price list" before Supplier call` | The recap to-do rings |
 | 1:50-2:15 | **4. Voice close-out** | Say into a Bee voice note: "Done with the price list for Musa." | `[journal] Done with the price list for Musa`, then `[done via voice] Send Musa the price list ("the price list for Musa")` | The to-do is checked off |
 | 2:15-2:35 | **5. Evening review** | Run `npm run review` live. VO: "At the end of the day: what I kept, what moves to tomorrow." | `[review 2026-10-xx] Nectar: 2/3 kept today. Open: ...`, then `kept:` and `carried to tomorrow:` lines | The summary to-do arrives |
-| 2:35-2:50 | **6. How it works and why** | VO: "Bee stream, proxy API and MCP, Amazon Bedrock to find the promise, Bee to-dos to nudge. For managers who make verbal promises all day." Repo link on screen. | Architecture diagram (README), then a 2 s flash of `src/bee/` | |
+| 2:35-2:50 | **6. How it works and why** | VO: "Bee stream, proxy API and MCP, Claude Haiku on the Anthropic API to find the promise, Bee to-dos to nudge. For managers who make verbal promises all day." Repo link on screen. | Architecture diagram (README), then a 2 s flash of `src/bee/` | |
 
 The "kept" count in scene 5 replaces the old console counter: the review line itself is the proof that the loop closed.
 
 ## Scene notes
 
-1. **Capture.** This must be live and un-staged-looking: your real colleague, your real voice. The terminal shows transcribed speech, so before recording make sure the colleague has consented on camera, and keep the terminal crop to your own line if they have not agreed to appear. The `[commitment open]` line proves the Bedrock extraction.
+1. **Capture.** This must be live and un-staged-looking: your real colleague, your real voice. The terminal shows transcribed speech, so before recording make sure the colleague has consented on camera, and keep the terminal crop to your own line if they have not agreed to appear. The `[commitment open]` line proves the model extraction (Claude Haiku via the Anthropic API).
 2. **Nudge.** Film the watch face and the terminal clock in the same frame once, so the viewer can see the alarm is real.
 3. **Recap.** Depends on `bee today --json`, whose shape is undocumented. Verify it before the shoot (see the fallback below).
 4. **Close-out.** Speak naturally ("done with the price list" is enough). If you say it before the to-do exists, nothing completes.
@@ -40,10 +40,10 @@ The "kept" count in scene 5 replaces the old console counter: the review line it
 
 ## Pre-shoot checks (do these once, before recording)
 
-- [ ] `npm run check:g0 -- --bedrock --alarm --stream 60`: all pass, alarm reaches the watch, utterances carry `conversation_uuid`.
+- [ ] `npm run check:g0 -- --bedrock --alarm --stream 60` (the flag checks the configured provider, here `anthropic`): all pass, alarm reaches the watch, utterances carry `conversation_uuid`.
 - [ ] A spoken "done with..." voice note completes a to-do (this is scene 4).
 - [ ] A calendar event 10-12 min ahead produces a `[recap]` line (scene 3).
-- [ ] `npm run eval` has been run, so the Bedrock numbers are recorded in `docs/aws.md`.
+- [ ] `npm run eval` has been run, so the extraction numbers (7/7 right, 0 false positives on the 10-case set) are on record. Do not claim Bedrock in the video: the run uses the Anthropic API.
 - [ ] No duplicate to-dos on the watch after a full day of use.
 
 ## Fallback
