@@ -143,7 +143,7 @@ describe('catch-up with the documented changefeed', () => {
     const { client, fetched } = clientFor();
     const r = await catchUp(client, new Store(':memory:'));
     expect(fetched).not.toContain('4513');
-    expect(r).toMatchObject({ conversationsFetched: 1, conversationsSkipped: 1 });
+    expect(r).toMatchObject({ conversationsFetched: 1, conversationsSkipped: 1, todoIds: [] });
   });
 
   it('stores an utterance seen live and again in catch-up once, under the uuid', async () => {

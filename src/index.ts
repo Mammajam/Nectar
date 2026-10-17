@@ -1,4 +1,4 @@
-import { CloseOutHandler } from './actions/closeout.js';
+import { CloseOutHandler, closeOutChangedTodos } from './actions/closeout.js';
 import { RecapScheduler } from './actions/recap.js';
 import { describeReview, describeScheduled } from './actions/report.js';
 import { EveningReview, REVIEW_LAST_KEY, reviewDue } from './actions/review.js';
@@ -121,6 +121,7 @@ async function main() {
   // Catch-up now and on a timer; the live stream is at-most-once.
   const runCatchUp = async (label: string) => {
     const r = await catchUp(client, store, (e) => pipeline?.onEvent(e));
+    for (const d of await closeOutChangedTodos(client, closeOut, r.todoIds)) log.info(`[done via ${d.via}] ${d.commitment.what}`);
     if (label === 'startup' || r.newUtterances > 0) {
       log.info(`Catch-up (${label}): ${r.changesSeen} changes, ${r.conversationsFetched} conversations${r.conversationsSkipped ? ` (${r.conversationsSkipped} still in progress)` : ''}, ${r.newUtterances} new utterances`);
     }

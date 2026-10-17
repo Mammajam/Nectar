@@ -27,6 +27,11 @@ describe('classifyEvent', () => {
     expect(classifyEvent({}, 'connected').kind).toBe('connected');
   });
 
+  it('treats the stream\'s opening { timestamp } as the connect signal', () => {
+    expect(classifyEvent({ timestamp: 1792255588138 }).kind).toBe('connected');
+    expect(classifyEvent({ timestamp: 1, other: true }).kind).toBe('unknown');
+  });
+
   it('keeps unknown payloads instead of throwing', () => {
     const e = classifyEvent('plain text', 'mystery');
     expect(e.kind).toBe('unknown');

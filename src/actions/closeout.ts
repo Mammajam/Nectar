@@ -1,5 +1,5 @@
 import type { BeeClient } from '../bee/client.js';
-import type { BeeEvent } from '../bee/types.js';
+import { classifyEvent, isObject, type BeeEvent } from '../bee/types.js';
 import type { StoredCommitment, Store } from '../store/db.js';
 import { overlap } from '../util/text.js';
 
@@ -66,4 +66,24 @@ export class CloseOutHandler {
     this.store.markDone(c.id, 'voice');
     return { commitment: c, via: 'voice', phrase };
   }
+}
+
+/**
+ * Close out commitments whose Bee to-do was completed elsewhere (the watch, the app).
+ * `bee stream` does not deliver those changes, so this runs on the changefeed's to-do ids.
+ */
+export async function closeOutChangedTodos(client: BeeClient, handler: CloseOutHandler, ids: string[]): Promise<CloseOutResult[]> {
+  const done: CloseOutResult[] = [];
+  for (const id of ids) {
+    try {
+      const fetched = (await client.getTodo(id)) as unknown;
+      const todo = isObject(fetched) && isObject(fetched.todo) ? fetched.todo : fetched;
+      if (!isObject(todo)) continue;
+      const result = await handler.handle(classifyEvent({ todo }));
+      if (result) done.push(result);
+    } catch {
+      /* a to-do deleted since the changefeed listed it is not a problem */
+    }
+  }
+  return done;
 }

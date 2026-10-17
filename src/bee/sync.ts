@@ -9,6 +9,8 @@ export interface CatchUpResult {
   conversationsFetched: number;
   /** Conversations not yet COMPLETED; skipped until Bee reports them again. */
   conversationsSkipped: number;
+  /** Ids of to-dos that changed. `bee stream` does not report to-do changes made elsewhere, so callers check these. */
+  todoIds: string[];
   newUtterances: number;
   cursor: string | null;
 }
@@ -46,8 +48,10 @@ export async function catchUp(
 ): Promise<CatchUpResult> {
   const page = await client.changes(store.get(CHANGES_CURSOR_KEY));
   const conversationIds = new Set<string>();
+  const todoIds = new Set<string>();
   let skipped = 0;
   for (const c of page.changes) {
+    if (c.type === 'todo') todoIds.add(String(c.id));
     if (c.type !== 'conversation') continue;
     // The changefeed lists conversations still in progress; wait until they are complete.
     if (c.state !== undefined && c.state.toUpperCase() !== 'COMPLETED') {
@@ -81,6 +85,7 @@ export async function catchUp(
     changesSeen: page.changes.length,
     conversationsFetched: conversationIds.size,
     conversationsSkipped: skipped,
+    todoIds: [...todoIds],
     newUtterances,
     cursor: page.cursor,
   };

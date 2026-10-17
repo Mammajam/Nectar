@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CloseOutHandler, matchCommitment, parseCloseOut } from '../src/actions/closeout.js';
+import { CloseOutHandler, closeOutChangedTodos, matchCommitment, parseCloseOut } from '../src/actions/closeout.js';
 import { classifyEvent } from '../src/bee/types.js';
 import { Store } from '../src/store/db.js';
 import { FakeBee } from './helpers/fake-bee.js';
@@ -56,5 +56,23 @@ describe('CloseOutHandler', () => {
   it('matchCommitment prefers the best overlap', () => {
     const { store } = setup();
     expect(matchCommitment('called the landlord', store.listCommitments(['open']))?.what).toBe('Call the landlord');
+  });
+});
+
+describe('closeOutChangedTodos', () => {
+  it('completes commitments whose Bee to-do was ticked off elsewhere, and ignores open or missing to-dos', async () => {
+    const bee = new FakeBee();
+    const store = new Store(':memory:');
+    const base = { who: 'Musa', dueText: null, dueAt: null, confidence: 0.9, quote: '' };
+    const a = store.insertCommitment({ ...base, what: 'Send Musa the price list' }, 'c1', 'open');
+    const b = store.insertCommitment({ ...base, what: 'Call the landlord' }, 'c1', 'open');
+    store.markScheduled(a, 't1', new Date(), new Date());
+    store.markScheduled(b, 't2', new Date(), new Date());
+    bee.todos.set('t1', { id: 't1', text: 'Send Musa the price list', completed: true });
+    bee.todos.set('t2', { id: 't2', text: 'Call the landlord', completed: false });
+    const results = await closeOutChangedTodos(bee.asClient(), new CloseOutHandler(bee.asClient(), store), ['t1', 't2', 'gone']);
+    expect(results.map((r) => [r.commitment.what, r.via])).toEqual([['Send Musa the price list', 'bee-app']]);
+    expect(store.getCommitment(a)?.status).toBe('done');
+    expect(store.getCommitment(b)?.status).toBe('open');
   });
 });

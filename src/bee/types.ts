@@ -117,6 +117,8 @@ export function classifyEvent(payload: unknown, eventName: string | null = null)
   const name = eventName ?? (typeof raw.type === 'string' ? raw.type : null);
 
   if (name === 'connected' || raw.connected === true) return { kind: 'connected', raw };
+  // `bee stream --json` opens with a bare `{ "timestamp": <ms> }` (not in the docs): treat it as the connect signal.
+  if (name === null && Object.keys(raw).length === 1 && typeof raw.timestamp === 'number') return { kind: 'connected', raw };
 
   if (isObject(raw.utterance)) {
     const u = raw.utterance as BeeUtterance;
