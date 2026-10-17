@@ -6,7 +6,7 @@
  * and fewer than 2 false positives across the no-promise cases.
  */
 import { readFileSync } from 'node:fs';
-import { BedrockStructuredLlm } from '../src/ai/bedrock.js';
+import { createLlm } from '../src/ai/provider.js';
 import { scoreCase, type ExpectedCommitment } from '../src/ai/evaluate.js';
 import { CommitmentExtractor } from '../src/ai/extractor.js';
 import { loadConfig } from '../src/config.js';
@@ -26,12 +26,12 @@ async function main() {
   const modelId = modelArg >= 0 ? process.argv[modelArg + 1]! : config.modelId;
   const set = JSON.parse(readFileSync(new URL('../test/fixtures/eval-set.json', import.meta.url), 'utf8')) as EvalSet;
 
-  const extractor = new CommitmentExtractor(new BedrockStructuredLlm(modelId, { region: config.awsRegion }), {
+  const extractor = new CommitmentExtractor(createLlm(config, modelId), {
     timezone: set.timezone,
     now: () => new Date(set.now),
   });
 
-  console.log(`Model ${modelId}, ${set.cases.length} cases, now = ${set.now}\n`);
+  console.log(`Provider ${config.provider}, model ${modelId}, ${set.cases.length} cases, now = ${set.now}\n`);
   let expectedTotal = 0;
   let matchedTotal = 0;
   let falsePositives = 0;

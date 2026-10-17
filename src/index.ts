@@ -3,9 +3,9 @@ import { RecapScheduler } from './actions/recap.js';
 import { describeReview, describeScheduled } from './actions/report.js';
 import { EveningReview, REVIEW_LAST_KEY, reviewDue } from './actions/review.js';
 import { TodoScheduler } from './actions/scheduler.js';
-import { BedrockStructuredLlm } from './ai/bedrock.js';
 import { createContextProvider, type ContextProvider } from './ai/context.js';
 import { CommitmentExtractor } from './ai/extractor.js';
+import { createLlm } from './ai/provider.js';
 import { UtteranceWindower } from './ai/windowing.js';
 import { BeeCli } from './bee/cli.js';
 import { BeeClient } from './bee/client.js';
@@ -92,8 +92,8 @@ async function main() {
   if (config.extractionEnabled) {
     const created = await createContextProvider(config.beeBin, client);
     context = created.provider;
-    log.info(`Context from Bee ${created.via === 'mcp' ? 'MCP server' : 'REST API (MCP unavailable)'}; model ${config.modelId}`);
-    const extractor = new CommitmentExtractor(new BedrockStructuredLlm(config.modelId, { region: config.awsRegion }), {
+    log.info(`Context from Bee ${created.via === 'mcp' ? 'MCP server' : 'REST API (MCP unavailable)'}; model ${config.provider}:${config.modelId}`);
+    const extractor = new CommitmentExtractor(createLlm(config), {
       timezone: config.timezone,
       minConfidence: config.minConfidence,
     });

@@ -34,7 +34,7 @@ Temperature is 0 for repeatable output. The current time and timezone are sent w
 
 ## Challenges
 
-- **Bedrock account quota (open as of 2026-10-17).** The AWS account used for this project was provisioned with an applied quota of 0 for the "tokens per day" quotas, so every Bedrock call returns `ThrottlingException: Too many tokens per day`, for Claude Haiku 4.5 and for Amazon Nova alike. The Anthropic use-case form and Marketplace subscription are done, and Service Quotas will not accept an increase at or below the default, so the fix has to come from AWS Support. Until it does, the model calls in this repo are covered by tests against a mocked Bedrock endpoint and have not been recorded live. See the friction log for the full entry.
+- **Bedrock account quota (open as of 2026-10-17).** The AWS account used for this project was provisioned with an applied quota of 0 for the "tokens per day" quotas, so every Bedrock call returns `ThrottlingException: Too many tokens per day`, for Claude Haiku 4.5 and for Amazon Nova alike. The Anthropic use-case form and Marketplace subscription are done, and Service Quotas will not accept an increase at or below the default, so the fix has to come from AWS Support. Until it does, the model calls in this repo are covered by tests against a mocked Bedrock endpoint and have not been recorded live. See the friction log for the full entry. Nectar's model layer is provider-neutral (`NECTAR_PROVIDER`), so the rest of the pipeline can run on another provider while this is open; any run that does not go through Bedrock is not part of the AWS integration described here.
 
 ## Evaluation
 

@@ -1,4 +1,5 @@
 export type StreamMode = 'cli' | 'sse';
+export type Provider = 'bedrock' | 'anthropic' | 'openai';
 
 export interface Config {
   beeBin: string;
@@ -8,8 +9,14 @@ export interface Config {
   timezone: string;
   streamMode: StreamMode;
   streamTypes: string[];
+  /** Which model API extracts commitments: Amazon Bedrock (default), Anthropic directly, or an OpenAI-compatible server (Ollama etc.). */
+  provider: Provider;
   awsRegion: string;
   modelId: string;
+  /** Base URL for the anthropic and openai providers; null = the provider's default. */
+  llmBaseUrl: string | null;
+  /** API key for the anthropic and openai providers. Never logged. */
+  llmApiKey: string | null;
   /** Commitments below this are discarded. */
   minConfidence: number;
   /** At or above this a commitment is "open"; below it, "suggested". */
@@ -34,6 +41,13 @@ export interface Config {
 }
 
 export const DEFAULT_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
+
+/** Model used when NECTAR_MODEL_ID is not set, per provider (`openai` defaults to a local Ollama model). */
+export const DEFAULT_MODELS: Record<Provider, string> = {
+  bedrock: DEFAULT_MODEL_ID,
+  anthropic: 'claude-haiku-4-5',
+  openai: 'llama3.1',
+};
 
 function num(env: NodeJS.ProcessEnv, key: string, fallback: number, min: number, max: number): number {
   const raw = env[key];
@@ -69,6 +83,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (mode !== 'cli' && mode !== 'sse') {
     throw new Error(`NECTAR_STREAM_MODE must be "cli" or "sse", got "${mode}"`);
   }
+  const provider = (env.NECTAR_PROVIDER ?? 'bedrock').toLowerCase();
+  if (provider !== 'bedrock' && provider !== 'anthropic' && provider !== 'openai') {
+    throw new Error(`NECTAR_PROVIDER must be "bedrock", "anthropic" or "openai", got "${provider}"`);
+  }
   const types = (env.NECTAR_STREAM_TYPES ?? '')
     .split(',')
     .map((t) => t.trim())
@@ -82,8 +100,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timezone: env.NECTAR_TIMEZONE ?? 'Africa/Monrovia',
     streamMode: mode,
     streamTypes: types.length > 0 ? types : DEFAULT_STREAM_TYPES,
+    provider,
     awsRegion: env.AWS_REGION || 'us-east-1',
-    modelId: env.NECTAR_MODEL_ID || DEFAULT_MODEL_ID,
+    modelId: env.NECTAR_MODEL_ID || DEFAULT_MODELS[provider],
+    llmBaseUrl: env.NECTAR_LLM_BASE_URL || null,
+    llmApiKey: (provider === 'anthropic' ? env.ANTHROPIC_API_KEY || env.NECTAR_LLM_API_KEY : env.NECTAR_LLM_API_KEY || env.OPENAI_API_KEY) || null,
     minConfidence: num(env, 'NECTAR_MIN_CONFIDENCE', 0.4, 0, 1),
     openThreshold: num(env, 'NECTAR_OPEN_THRESHOLD', 0.7, 0, 1),
     windowPauseMs: num(env, 'NECTAR_WINDOW_PAUSE_MS', 20_000, 1000, 600_000),

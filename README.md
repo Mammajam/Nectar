@@ -12,7 +12,7 @@ Built for the Amazon Developer *Build, Ship, Shape* hackathon: **Bee (Wearable A
 
 | Moment | What Nectar does | On the wrist |
 | --- | --- | --- |
-| You make a promise in conversation | Detects it with Amazon Bedrock, using your Bee facts and today's brief for names and times | — |
+| You make a promise in conversation | Detects it with a language model (Amazon Bedrock by default), using your Bee facts and today's brief for names and times | — |
 | Seconds later | Creates a Bee to-do with an alarm 10 min before it's due (or links an existing to-do or Bee suggestion) | `Send Musa the price list · due 3 PM` |
 | 10 min before a meeting | Lists what you still owe the people you're about to meet | `10 AM Supplier call: you owe Send Musa the price list +1` |
 | You say "done with the price list" | Completes the matching to-do | to-do checked off |
@@ -72,7 +72,7 @@ npm run check:g0 -- --bedrock --alarm    # 4. check Bee + Bedrock access
 npm run dev                              # 5. run it
 ```
 
-For Bedrock, run `aws configure` and submit the one-time Anthropic use-case form in the Bedrock console ([docs/aws.md](docs/aws.md)). No Anthropic access yet? Set `NECTAR_MODEL_ID=us.amazon.nova-lite-v1:0`.
+For Bedrock, run `aws configure` and submit the one-time Anthropic use-case form in the Bedrock console ([docs/aws.md](docs/aws.md)). No Anthropic access yet? Set `NECTAR_MODEL_ID=us.amazon.nova-lite-v1:0`. No working Bedrock quota? Set `NECTAR_PROVIDER=anthropic` with `ANTHROPIC_API_KEY`, or `NECTAR_PROVIDER=openai` for a local model such as Ollama (see below).
 
 Then talk near your watch. After 20 s of silence you'll see:
 
@@ -101,7 +101,10 @@ All settings live in `.env` (see [.env.example](.env.example)); defaults are sho
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `NECTAR_TIMEZONE` | `Africa/Monrovia` | Resolves "Friday" and "by 3 PM" |
-| `NECTAR_MODEL_ID` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Bedrock model or inference profile |
+| `NECTAR_PROVIDER` | `bedrock` | Model API: `bedrock`, `anthropic` (Anthropic's API directly) or `openai` (any OpenAI-compatible server, e.g. Ollama) |
+| `NECTAR_MODEL_ID` | per provider: `us.anthropic.claude-haiku-4-5-20251001-v1:0`, `claude-haiku-4-5`, `llama3.1` | Model for the chosen provider (Bedrock model or inference profile) |
+| `ANTHROPIC_API_KEY` | none | Key for `NECTAR_PROVIDER=anthropic` (or `NECTAR_LLM_API_KEY`); never logged |
+| `NECTAR_LLM_BASE_URL` / `NECTAR_LLM_API_KEY` | provider default / none | Endpoint and key for `openai`; default endpoint is Ollama at `http://localhost:11434/v1` |
 | `AWS_REGION` | `us-east-1` | Bedrock region |
 | `NECTAR_WINDOW_PAUSE_MS` | `20000` | Silence before a conversation is analyzed |
 | `NECTAR_MIN_CONFIDENCE` / `NECTAR_OPEN_THRESHOLD` | `0.4` / `0.7` | Drop below min; below open becomes "suggested" (no alarm) |
@@ -146,7 +149,7 @@ Bee documents the CLI changefeed (`bee changed --json`) and the `bee stream` pay
 
 ## Privacy
 
-Bee records the people around you. Ask for consent before recording colleagues. All Nectar data stays on your machine in `data/` (ignored by git); only the conversation window being analyzed is sent to Amazon Bedrock.
+Bee records the people around you. Ask for consent before recording colleagues. All Nectar data stays on your machine in `data/` (ignored by git); only the conversation window being analyzed is sent to the configured model provider: Amazon Bedrock by default, Anthropic's API if `NECTAR_PROVIDER=anthropic`, or nothing at all outside your machine with a local `openai`-compatible server such as Ollama.
 
 ## License
 

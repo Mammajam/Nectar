@@ -3,12 +3,12 @@
  *   npm run check:g0                  read-only checks
  *   npm run check:g0 -- --stream 60   also listen 60 s: say a sentence, press Enter, and it times the lag
  *   npm run check:g0 -- --alarm       also create a test todo with an alarm 5 min ahead
- *   npm run check:g0 -- --bedrock     also make one Bedrock call with NECTAR_MODEL_ID
+ *   npm run check:g0 -- --llm         also make one model call with NECTAR_PROVIDER and NECTAR_MODEL_ID (--bedrock is the same)
  */
 import { execFile } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
-import { BedrockStructuredLlm } from '../src/ai/bedrock.js';
+import { createLlm } from '../src/ai/provider.js';
 import { BeeClient } from '../src/bee/client.js';
 import { ensureProxy } from '../src/bee/proxy.js';
 import { CliStreamSource } from '../src/bee/stream.js';
@@ -21,7 +21,7 @@ const args = process.argv.slice(2);
 const streamIdx = args.indexOf('--stream');
 const streamSeconds = streamIdx >= 0 ? Number(args[streamIdx + 1] ?? 60) : 0;
 const wantAlarm = args.includes('--alarm');
-const wantBedrock = args.includes('--bedrock');
+const wantBedrock = args.includes('--bedrock') || args.includes('--llm');
 
 const results: { name: string; ok: boolean; detail: string }[] = [];
 const record = (name: string, ok: boolean, detail: string) => {
@@ -35,7 +35,7 @@ async function main() {
 
   if (wantBedrock) {
     try {
-      const llm = new BedrockStructuredLlm(config.modelId, { region: config.awsRegion, maxRetries: 1 });
+      const llm = createLlm(config);
       const t0 = Date.now();
       const out = await llm.structured({
         system: 'You are a test.',
@@ -43,10 +43,10 @@ async function main() {
         tool: { name: 'ping', description: 'Health check', schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] } },
         maxTokens: 50,
       });
-      record('Bedrock model call', true, `${config.modelId} answered ${JSON.stringify(out)} in ${Date.now() - t0} ms`);
+      record(`Model call (${config.provider})`, true, `${config.modelId} answered ${JSON.stringify(out)} in ${Date.now() - t0} ms`);
     } catch (e) {
       const name = (e as { name?: string }).name ?? 'Error';
-      record('Bedrock model call', false, `${name}: ${e instanceof Error ? e.message : String(e)}`);
+      record(`Model call (${config.provider})`, false, `${name}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
