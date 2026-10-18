@@ -1,0 +1,47 @@
+1
+00:00:00,350 --> 00:00:03,670
+Bee remembers what I say. Nectar makes sure I do it.
+
+2
+00:00:05,000 --> 00:00:07,820
+Here is Nectar running live on my Bee data.
+
+3
+00:00:08,200 --> 00:00:11,420
+I tell a colleague: I'll send Mariama the document in ten minutes.
+
+4
+00:00:17,000 --> 00:00:21,660
+Nectar finds the promise with Claude Haiku and creates a Bee to-do with an alarm.
+
+5
+00:00:25,500 --> 00:00:30,400
+All of it comes from the Apple Watch on my wrist, running Bee and capturing live.
+
+6
+00:00:35,500 --> 00:00:42,320
+Then Bee's own alarm arrives as a notification. No custom app: it is all native Bee.
+
+7
+00:00:43,300 --> 00:00:52,100
+Here is the Bee app on my iPhone, capturing live. And the to-dos Nectar created are right there in Bee's own app, each with its alarm.
+
+8
+00:00:53,300 --> 00:01:06,340
+It is built entirely on Bee's own interfaces, all in one folder. The Bee proxy's REST API for to-dos, facts, conversations and the changefeed. And the Bee CLI for the live stream, today's brief and the MCP server.
+
+9
+00:01:06,800 --> 00:01:12,900
+The model is real too: Claude Haiku through Anthropic's API, as the console shows.
+
+10
+00:01:14,700 --> 00:01:21,540
+It is open source on GitHub, with a README that explains how it uses Bee. No custom watch app, only native Bee.
+
+11
+00:01:23,600 --> 00:01:28,980
+CI is green on every push. And a friction log of what broke on live data and how we fixed it.
+
+12
+00:01:30,200 --> 00:01:34,410
+Nectar. Bee remembers what you said. Nectar makes sure you do it.

@@ -7,3 +7,4 @@ bee-sync/
 *.db-*
 .DS_Store
 .claude/scheduled_tasks.lock
+docs/demo-video/voice/
