@@ -1,5 +1,27 @@
 # Nectar
 
+## Summary: what Bee already does vs. what Nectar adds
+
+*Research as of 2026-10-18, from Bee's public docs, the Amazon announcement and the Bee CLI skill in this repo. Not verified on a live account for every row.*
+
+Bee already provides most of the plumbing Nectar uses: to-dos with alarms (`bee todos create --alarm-at`), Bee's own to-do suggestions (`bee todos suggestions`, `accept-suggestion`), a live stream (`bee stream`), a changefeed for catch-up (`bee changed`), facts, today's brief, and an MCP server. Bee also proposes to-dos from conversations. Its docs don't describe the commitment loop, which Nectar adds:
+
+| Feature | Built into Bee? |
+| --- | --- |
+| Detect promises from conversation | Partly. Bee suggests to-dos and calls them commitments. Nectar's extractor adds wearer-only filtering, confidence scores and due-time resolution. |
+| To-do with alarm | Yes |
+| Accept Bee's suggestions | Yes |
+| Dedupe against existing to-dos and suggestions | No. Nectar does this before it creates anything. |
+| Due time separate from the alarm | No. Bee to-dos have only `alarmAt`. |
+| Live stream and catch-up | Yes |
+| Pre-meeting recap | No. `bee today` has a calendar brief, but nothing is documented to push before a meeting. |
+| Voice close-out ("done with X") | Partly. Voice notes can yield to-dos, but a spoken completion did not reliably close one in testing. Completing in the app or on the watch works. |
+| Evening review and rollover to 9 AM | No. Daily summaries exist, but there is no kept-versus-open scoring or automatic rollover. |
+
+Open points: Amazon's announcement mentions "Actions" (follow-up email drafts and meeting invites from commitments), which I could not confirm in developer docs. Bee's docs also don't say how the wrist is notified when an alarm fires; Nectar's alarm behavior depends on that, so check it on a live account.
+
+Full write-up and sources: [docs/bee-feature-research.md](docs/bee-feature-research.md).
+
 **Bee remembers what you said. Nectar makes sure you do it.**
 
 Nectar is an ambient commitment agent for [Bee](https://docs.bee.computer/docs), Amazon's wearable AI. It listens to live conversation data from Bee on an Apple Watch, detects the promises you make ("I'll send Musa the price list by 3 PM"), and turns them into Bee to-dos whose alarms fire on your wrist. A voice note closes them out, and an evening review tells you what you kept.
