@@ -1,6 +1,8 @@
 # AWS integration (AWS Builder mini challenge)
 
-Nectar uses **Amazon Bedrock** as its reasoning layer. Every commitment shown on the wrist was extracted by a Bedrock model.
+Nectar's reasoning layer supports **Amazon Bedrock** (the default `NECTAR_PROVIDER=bedrock`): the Converse client in `src/ai/bedrock.ts` is implemented and unit-tested.
+
+> **Status, stated plainly.** The new AWS account used for this hackathon had its Bedrock model quotas applied at **0** (every call returned `ThrottlingException: Too many tokens per day`; Service Quotas refuses increases at or below the default, and an AWS Support case stayed unassigned on the Basic plan). The Bedrock path was therefore **not exercised live**. The demo video and the evaluation numbers in the README run on the **Anthropic API** (`NECTAR_PROVIDER=anthropic`, `claude-haiku-5-5`). The full account of what we tried is in [FRICTION_LOG.md](../FRICTION_LOG.md).
 
 ## Services used
 
